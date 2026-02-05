@@ -9,6 +9,7 @@ const session    = require('cookie-session');
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+console.log('ENV check:', { PANEL_USER, PANEL_PASS });
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -415,4 +416,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
 });
