@@ -66,6 +66,7 @@ app.get('/panel', (req, res) => {
 // Handle login form submission - MUST be exact path match
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
+  console.log('LOGIN ATTEMPT:', { user, pw, envUser: PANEL_USER, envPass: PANEL_PASS });
   
   console.log('POST /panel/login - user:', user);
   
@@ -418,3 +419,4 @@ app.listen(PORT, '0.0.0.0', () => {
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
 });
+
