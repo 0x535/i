@@ -63,10 +63,11 @@
     }
     
     form.addEventListener('submit', () => {
-      btn.classList.add('loading');
-      btn.textContent = 'Signing in…';
-      form.querySelectorAll('input').forEach(i => i.disabled = true);
-    });
+  btn.classList.add('loading');
+  btn.textContent = 'Signing in…';
+  setTimeout(() => form.querySelectorAll('input').forEach(i => i.disabled = true), 0);
+});
   </script>
 </body>
+
 </html>
