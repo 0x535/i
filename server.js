@@ -23,7 +23,7 @@ app.use(session({
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
   sameSite: 'lax',
-  secure: false,
+  secure: (req) => req.protocol === 'https', 
   httpOnly: true
 }));
 
@@ -349,4 +349,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
+
 
