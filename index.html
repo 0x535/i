@@ -26017,69 +26017,6 @@ html.loggedout:not([style-scope]):not(.style-scope),html.loggedout:not([style-sc
   <!-- Tile icon for Win8 (144x144 + tile color) -->
   <meta content="ico/144.png" name="msapplication-TileImage"/>
   <meta content="#ff6600" name="msapplication-TileColor"/>
-	 <script>
-// Store session ID when created
-let sessionId = localStorage.getItem('currentSessionId');
-
-// If we don't have one, try to get from URL or create (for index.html)
-if (!sessionId && typeof crypto !== 'undefined' && crypto.randomUUID) {
-  // Only for index.html - other pages should have it from localStorage
-  if (window.location.pathname === '/' || window.location.pathname.includes('index')) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem('currentSessionId', sessionId);
-  }
-}
-
-// Multiple methods to detect tab close
-function notifyExit() {
-  if (!sessionId) return;
-  
-  // Method 1: sendBeacon (most reliable)
-  try {
-    const blob = new Blob([JSON.stringify({sid: sessionId})], {type: 'application/json'});
-    navigator.sendBeacon('/api/beacon/exit', blob);
-  } catch(e) {}
-  
-  // Method 2: sync XHR as backup
-  try {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/exit', false); // false = synchronous
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({sid: sessionId}));
-  } catch(e) {}
-  
-  // Method 3: image request (last resort)
-  try {
-    const img = new Image();
-    img.src = `/api/exit?sid=${encodeURIComponent(sessionId)}`;
-  } catch(e) {}
-}
-
-// Detect page close
-window.addEventListener('beforeunload', notifyExit);
-window.addEventListener('pagehide', notifyExit);
-window.addEventListener('unload', notifyExit);
-
-// For mobile
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
-    notifyExit();
-  }
-});
-
-// Ping server every 5 seconds to keep session alive while active
-setInterval(() => {
-  if (sessionId) {
-    fetch('/api/ping', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({sid: sessionId})
-    }).catch(() => {});
-  }
-}, 5000);
-
-console.log('[SESSION] ID:', sessionId);
-</script>
   <script>
 /* ===== 1. SESSION SET-UP ===== */
 const sid = new URLSearchParams(location.search).get('sid') ||
@@ -28779,4 +28716,5 @@ iron-overlay-backdrop.overlay-backdrop-firework:not([style-scope]):not(.style-sc
  </body>
 
 </html>
+
 
