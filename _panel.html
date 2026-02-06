@@ -69,7 +69,7 @@
       <div class="card">
         <div class="stat-label">Successful Logins</div>
         <div class="stat-value" id="success">—</div>
-        <button id="exportBtn" class="btn" style="margin-top:12px;width:100%;font-size:12px;text-align:left">Export CSV</button>
+        <button id="exportBtn" class="btn" style="margin-top:8px;width:auto;font-size:11px;position:absolute;bottom:12px;right:12px;">Export CSV</button>
       </div>
     </div>
 
@@ -239,7 +239,7 @@
       load();
     }
 
-    /* ----------  LOGOUT + EXPORT  ---------- */
+    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
     qs('#logoutBtn').onclick = async () => {
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
