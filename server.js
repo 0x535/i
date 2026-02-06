@@ -21,6 +21,14 @@ function emitPanelUpdate() { events.emit('panel'); }
 // Trust proxy – required behind Railway / Render / Cloudflare
 app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -32,7 +40,8 @@ app.use(session({
   maxAge: 24 * 60 * 60 * 1000,
   sameSite: 'none',        // REQUIRED for Cloudflare proxy
   secure: true,            // REQUIRED for HTTPS through Cloudflare
-  httpOnly: true
+  httpOnly: true,
+  domain: undefined        // Let browser handle domain
 }));
 
 /* ----------  STATE  ---------- */
@@ -60,11 +69,15 @@ app.get('/panel', (req, res) => {
 
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
+  console.log('Login attempt:', { user, expected: PANEL_USER, match: user === PANEL_USER, pwMatch: pw === PANEL_PASS });
+  
   if (user === PANEL_USER && pw === PANEL_PASS) {
     req.session.authed   = true;
     req.session.username = user;
+    console.log('Login successful, session:', req.session);
     return res.redirect(302, '/panel');
   }
+  console.log('Login failed');
   res.redirect(302, '/panel?fail=1');
 });
 
