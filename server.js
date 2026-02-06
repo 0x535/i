@@ -12,26 +12,26 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS });
+console.log('ENV check:', { PANEL_USER, PANEL_PASS: PANEL_PASS ? '***' : 'not set' });
 
 /* ----------  SIMPLE EVENT BUS  ---------- */
 const events = new (require('events')).EventEmitter();
 function emitPanelUpdate() { events.emit('panel'); }
 
-// Trust proxy – required behind Railway / Render
-app.set('trust proxy', 1);
+// Trust proxy – required behind Railway / Render / Cloudflare
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware – MUST be before routes
+// Session middleware – FIXED for Cloudflare proxy
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'lax',
-  secure: (req) => req.protocol === 'https',
+  sameSite: 'none',        // REQUIRED for Cloudflare proxy
+  secure: true,            // REQUIRED for HTTPS through Cloudflare
   httpOnly: true
 }));
 
@@ -256,8 +256,6 @@ app.post('/api/page', async (req, res) => {
     res.status(500).send('Error');
   }
 });
-
-// REMOVED: /api/exit endpoint - tab close detection removed
 
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
