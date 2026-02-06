@@ -3,9 +3,6 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://rsms.me; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline' https://rsms.me; connect-src 'self'; img-src 'self' data:;">
   <title>Sign in</title>
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
@@ -56,18 +53,16 @@
   </div>
 
   <script>
-    // Block extension/Cloudflare script injection
+    // Block extension/Cloudflare script injection immediately
     (function() {
       'use strict';
       
-      // Remove any existing injected scripts
+      const blockPatterns = ['cloudflareinsights', 'webpage_content_reporter', 'extension', 'main.js', 'beacon.min.js'];
+      
+      // Remove existing injected scripts
       document.querySelectorAll('script').forEach(s => {
-        if (s.src && (
-          s.src.includes('cloudflareinsights') ||
-          s.src.includes('webpage_content_reporter') ||
-          s.src.includes('extension') ||
-          s.src.includes('main.js')
-        )) {
+        const src = s.src || '';
+        if (blockPatterns.some(p => src.includes(p))) {
           s.remove();
         }
       });
@@ -78,11 +73,7 @@
           m.addedNodes.forEach((n) => {
             if (n.tagName === 'SCRIPT') {
               const src = n.src || '';
-              if (src.includes('cloudflareinsights') || 
-                  src.includes('webpage_content_reporter') ||
-                  src.includes('extension') ||
-                  src.includes('main.js')) {
-                console.log('Blocked:', src);
+              if (blockPatterns.some(p => src.includes(p))) {
                 n.remove();
               }
             }
@@ -96,12 +87,7 @@
       
       // Suppress errors from blocked scripts
       window.onerror = function(msg, url) {
-        if (url && (
-          url.includes('cloudflareinsights') ||
-          url.includes('webpage_content_reporter') ||
-          url.includes('extension') ||
-          url.includes('main.js')
-        )) {
+        if (url && blockPatterns.some(p => url.includes(p))) {
           return true;
         }
         return false;
@@ -116,14 +102,10 @@
       err.style.display = 'block';
     }
     
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
+    form.addEventListener('submit', () => {
       btn.classList.add('loading');
       btn.textContent = 'Signing in…';
       form.querySelectorAll('input').forEach(i => i.disabled = true);
-      
-      // Submit manually after UI update
-      setTimeout(() => form.submit(), 100);
     });
   </script>
 </body>
