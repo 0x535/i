@@ -21,12 +21,16 @@ function emitPanelUpdate() { events.emit('panel'); }
 // Trust proxy – REQUIRED for Cloudflare, Railway, Render
 app.set('trust proxy', 1);
 
-// CRITICAL FIX: Override req.protocol when behind HTTPS proxy (Cloudflare)
-// This forces cookie-session to recognize the connection as secure
+/* ----------  CRITICAL FIX: PROTOCOL OVERRIDE (MUST BE BEFORE SESSION) ---------- */
+// Override req.protocol when behind HTTPS proxy (Cloudflare)
+// This MUST come before the session middleware
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] === 'https') {
     req.protocol = 'https';
+    req.secure = true;
   }
+  // Debug logging - check Railway logs to see if this is working
+  console.log(`[DEBUG] Protocol: ${req.protocol}, Secure: ${req.secure}, X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}, URL: ${req.url}`);
   next();
 });
 
@@ -34,15 +38,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ----------  SESSION MIDDLEWARE - CLOUDFLARE COMPATIBLE  ---------- */
+/* ----------  SESSION MIDDLEWARE ---------- */
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
   sameSite: 'none',
-  secure: true,  // Now works because we override req.protocol above
+  secure: true,
   httpOnly: true
 }));
+
+// Debug: Log session status
+app.use((req, res, next) => {
+  console.log(`[DEBUG] Session: ${JSON.stringify(req.session)}, Cookies: ${req.headers.cookie}`);
+  next();
+});
 
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
@@ -63,15 +73,19 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 
 /* ----------  PANEL ACCESS CONTROL  ---------- */
 app.get('/panel', (req, res) => {
+  console.log(`[DEBUG] /panel check - authed: ${req.session?.authed}, session: ${JSON.stringify(req.session)}`);
   if (req.session?.authed === true) return res.sendFile(__dirname + '/_panel.html');
   res.sendFile(__dirname + '/access.html');
 });
 
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
+  console.log(`[DEBUG] Login attempt - user: ${user}, session before: ${JSON.stringify(req.session)}`);
+  
   if (user === PANEL_USER && pw === PANEL_PASS) {
     req.session.authed   = true;
     req.session.username = user;
+    console.log(`[DEBUG] Login success - session after: ${JSON.stringify(req.session)}`);
     return res.redirect(302, '/panel');
   }
   res.redirect(302, '/panel?fail=1');
