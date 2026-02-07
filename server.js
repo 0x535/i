@@ -21,42 +21,28 @@ function emitPanelUpdate() { events.emit('panel'); }
 // Trust proxy – REQUIRED for Cloudflare, Railway, Render
 app.set('trust proxy', 1);
 
+// CRITICAL FIX: Override req.protocol when behind HTTPS proxy (Cloudflare)
+// This forces cookie-session to recognize the connection as secure
+app.use((req, res, next) => {
+  if (req.headers['x-forwarded-proto'] === 'https') {
+    req.protocol = 'https';
+  }
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ----------  SESSION MIDDLEWARE - CLOUDFLARE COMPATIBLE  ---------- */
-// Helper to detect HTTPS (works behind Cloudflare, Railway, any proxy)
-function isSecure(req) {
-  return req.headers['x-forwarded-proto'] === 'https' || 
-         req.protocol === 'https' || 
-         req.secure === true;
-}
-
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
-  // Dynamic cookie options based on actual request security
-  cookie: {
-    sameSite: 'none',
-    secure: true,  // Always true - Cloudflare handles HTTPS, we trust the proxy
-    httpOnly: true
-  }
+  sameSite: 'none',
+  secure: true,  // Now works because we override req.protocol above
+  httpOnly: true
 }));
-
-// Alternative: Use a middleware wrapper to set secure based on X-Forwarded-Proto
-app.use((req, res, next) => {
-  // Force secure cookie when behind HTTPS proxy (Cloudflare)
-  if (isSecure(req)) {
-    req.sessionOptions.secure = true;
-    req.sessionOptions.sameSite = 'none';
-  } else {
-    req.sessionOptions.secure = false;
-    req.sessionOptions.sameSite = 'lax';
-  }
-  next();
-});
 
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
