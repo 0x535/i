@@ -81,18 +81,74 @@
   </div>
 
   <script>
-    // Simple clock
+    // Token from server injection (replaced by server)
+    const SERVER_TOKEN = null;
+    
+    // Initialize auth token from multiple sources
+    let AUTH_TOKEN = null;
+    
+    function initToken() {
+      // Priority: server injection > URL param > localStorage > sessionStorage
+      if (SERVER_TOKEN) {
+        AUTH_TOKEN = SERVER_TOKEN;
+        console.log('Using server-injected token');
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        
+        if (urlToken) {
+          AUTH_TOKEN = urlToken;
+          console.log('Using URL token');
+          // Store in both storages for redundancy
+          try {
+            localStorage.setItem('panel_token', AUTH_TOKEN);
+            sessionStorage.setItem('panel_token', AUTH_TOKEN);
+          } catch(e) {}
+          // Clean URL without reloading
+          if (window.history.replaceState) {
+            window.history.replaceState({}, document.title, '/panel');
+          }
+        } else {
+          // Try storage
+          try {
+            AUTH_TOKEN = localStorage.getItem('panel_token') || sessionStorage.getItem('panel_token');
+          } catch(e) {}
+          if (AUTH_TOKEN) {
+            console.log('Using stored token');
+          }
+        }
+      }
+      
+      if (!AUTH_TOKEN) {
+        console.log('No token found, redirecting to login');
+        window.location.href = '/panel';
+        return false;
+      }
+      return true;
+    }
+    
+    // Initialize immediately
+    if (!initToken()) {
+      throw new Error('Not authenticated');
+    }
+
+    // Clock
     setInterval(() => {
-      const d = new Date();
-      document.getElementById('clock').textContent = d.toLocaleTimeString();
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString();
     }, 1000);
 
     function logout() {
-      fetch('/panel/logout', {method: 'POST'}).then(() => location.href = '/panel');
+      try {
+        localStorage.removeItem('panel_token');
+        sessionStorage.removeItem('panel_token');
+      } catch(e) {}
+      AUTH_TOKEN = null;
+      window.location.href = '/panel/logout';
     }
 
     function exportCSV() {
-      location.href = '/api/export';
+      if (!AUTH_TOKEN) return;
+      window.location.href = '/api/export?token=' + encodeURIComponent(AUTH_TOKEN);
     }
 
     function pageName(p) {
@@ -101,6 +157,15 @@
     }
 
     function render(data) {
+      // Update token if server returned new one
+      if (data.token && data.token !== AUTH_TOKEN) {
+        AUTH_TOKEN = data.token;
+        try {
+          localStorage.setItem('panel_token', AUTH_TOKEN);
+          sessionStorage.setItem('panel_token', AUTH_TOKEN);
+        } catch(e) {}
+      }
+      
       document.getElementById('user').textContent = data.username;
       document.getElementById('active').textContent = data.active;
       document.getElementById('total').textContent = data.totalVictims;
@@ -140,27 +205,50 @@
     }
 
     function action(act, sid) {
-      fetch('/api/panel', {
+      if (!AUTH_TOKEN) return;
+      fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN), {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({action: act, sid: sid})
       }).then(() => load());
     }
 
+    let failCount = 0;
+    
     function load() {
-      fetch('/api/panel')
+      if (!AUTH_TOKEN) {
+        window.location.href = '/panel';
+        return;
+      }
+      
+      fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN))
         .then(r => {
-          if (r.status === 401) return location.href = '/panel';
+          if (r.status === 401) {
+            failCount++;
+            if (failCount > 2) {
+              // Clear storage and redirect
+              try {
+                localStorage.removeItem('panel_token');
+                sessionStorage.removeItem('panel_token');
+              } catch(e) {}
+              window.location.href = '/panel';
+            }
+            return null;
+          }
+          failCount = 0;
           return r.json();
         })
         .then(data => {
           if (data) render(data);
         })
-        .catch(e => console.error('Load error:', e));
+        .catch(e => {
+          console.error('Load error:', e);
+        });
     }
 
+    // Load immediately and then poll
     load();
-    setInterval(load, 1000);
+    setInterval(load, 2000);
   </script>
 </body>
 </html>
