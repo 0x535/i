@@ -18,19 +18,20 @@ console.log('ENV check:', { PANEL_USER, PANEL_PASS });
 const events = new (require('events')).EventEmitter();
 function emitPanelUpdate() { events.emit('panel'); }
 
-// Trust proxy – REQUIRED for Cloudflare, Railway, Render
+/* ----------  CRITICAL: TRUST PROXY MUST BE FIRST ---------- */
+// Trust first proxy (Cloudflare, Railway, Render)
 app.set('trust proxy', 1);
 
-/* ----------  CRITICAL FIX: PROTOCOL OVERRIDE (MUST BE BEFORE SESSION) ---------- */
-// Override req.protocol when behind HTTPS proxy (Cloudflare)
-// This MUST come before the session middleware
+/* ----------  PROTOCOL OVERRIDE FOR CLOUDFLARE ---------- */
+// Must be BEFORE session middleware
 app.use((req, res, next) => {
+  // Cloudflare sets X-Forwarded-Proto header
   if (req.headers['x-forwarded-proto'] === 'https') {
     req.protocol = 'https';
     req.secure = true;
   }
-  // Debug logging - check Railway logs to see if this is working
-  console.log(`[DEBUG] Protocol: ${req.protocol}, Secure: ${req.secure}, X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}, URL: ${req.url}`);
+  // Debug logging - check Railway logs to verify this works
+  console.log(`[DEBUG] Protocol: ${req.protocol}, Secure: ${req.secure}, X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}, Host: ${req.headers.host}, URL: ${req.url}`);
   next();
 });
 
@@ -38,14 +39,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ----------  SESSION MIDDLEWARE ---------- */
+/* ----------  SESSION MIDDLEWARE - FIXED ---------- */
+const isProduction = process.env.NODE_ENV === 'production' || 
+                     process.env.RAILWAY_ENVIRONMENT === 'production' ||
+                     !!process.env.RAILWAY_STATIC_URL;
+
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'none',
-  secure: true,
+  sameSite: 'lax',           // ✅ Fixed: 'lax' instead of 'none'
+  secure: isProduction,      // ✅ Fixed: true in prod, false locally
   httpOnly: true
+  // No domain property - works universally on any domain
 }));
 
 // Debug: Log session status
@@ -411,5 +417,6 @@ app.get('/api/export', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Panel user: ${PANEL_USER}`);
+  console.log(`Environment: ${isProduction ? 'production' : 'development'}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
