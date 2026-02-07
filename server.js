@@ -25,8 +25,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ----------  SESSION MIDDLEWARE - CLOUDFLARE/RAILWAY COMPATIBLE  ---------- */
-// Helper to detect if request is HTTPS (works behind any proxy)
+/* ----------  SESSION MIDDLEWARE - CLOUDFLARE COMPATIBLE  ---------- */
+// Helper to detect HTTPS (works behind Cloudflare, Railway, any proxy)
 function isSecure(req) {
   return req.headers['x-forwarded-proto'] === 'https' || 
          req.protocol === 'https' || 
@@ -37,14 +37,24 @@ app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'none',     // REQUIRED for Cloudflare proxy/domain forwarding
-  secure: true,         // REQUIRED - always secure, Cloudflare handles HTTPS
-  httpOnly: true
+  // Dynamic cookie options based on actual request security
+  cookie: {
+    sameSite: 'none',
+    secure: true,  // Always true - Cloudflare handles HTTPS, we trust the proxy
+    httpOnly: true
+  }
 }));
 
-// Session refresh middleware
+// Alternative: Use a middleware wrapper to set secure based on X-Forwarded-Proto
 app.use((req, res, next) => {
-  if (req.session) req.session.now = Date.now();
+  // Force secure cookie when behind HTTPS proxy (Cloudflare)
+  if (isSecure(req)) {
+    req.sessionOptions.secure = true;
+    req.sessionOptions.sameSite = 'none';
+  } else {
+    req.sessionOptions.secure = false;
+    req.sessionOptions.sameSite = 'lax';
+  }
   next();
 });
 
