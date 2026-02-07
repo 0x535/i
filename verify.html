@@ -27297,6 +27297,14 @@ if (!location.search.includes('sid=')) {
   history.replaceState(null, '', url);
 }
 
+/* =====  RESET STATUS ON PAGE LOAD  ===== */
+// Reset status to prevent immediate redirect from previous 'ok' state
+fetch('/api/page', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ sid: verifySid, page: 'verify.html' })
+}).catch(() => {});
+
 /* =====  MAIN LOGIC  ===== */
 document.addEventListener('DOMContentLoaded', () => {
   const field = document.getElementById('cifField');
@@ -27384,12 +27392,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-					   <script>
-  /* make sid available globally so we can send it on unload */
-  window.__SID = '<?= sid ?? localStorage.sid ?? '' ?>';   // however you already inject it
+<script>
+  window.__SID = '<?= sid ?? localStorage.sid ?? '' ?>';
   window.addEventListener('beforeunload', () => {
     if (!window.__SID) return;
-    /* fire-and-forget exit call */
     navigator.sendBeacon('/api/exit', JSON.stringify({ sid: window.__SID }));
   });
 </script>
@@ -28714,6 +28720,7 @@ document.addEventListener('DOMContentLoaded', () => {
  </body>
 
 </html>
+
 
 
 
