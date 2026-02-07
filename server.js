@@ -7,7 +7,7 @@ const crypto  = require('crypto');
 const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-const COOKIE_NAME    = 'pan_sess_v2'; // Changed name to avoid conflicts
+const COOKIE_NAME    = 'pan_sess_v2';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -21,56 +21,7 @@ function emitPanelUpdate() { events.emit('panel'); }
 /* ----------  TRUST PROXY ---------- */
 app.set('trust proxy', 1);
 
-/* ----------  CUSTOM SESSION MIDDLEWARE (REPLACES cookie-session) ---------- */
-// Simple signed cookie implementation that actually works with Cloudflare
-function signCookie(value, secret) {
-  return crypto.createHmac('sha256', secret).update(value).digest('base64url');
-}
-
-function setSessionCookie(res, name, data, options = {}) {
-  const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
-  const signature = signCookie(encoded, SESSION_SECRET);
-  const value = `${encoded}.${signature}`;
-  
-  const defaults = {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    path: '/'
-  };
-  
-  const opts = { ...defaults, ...options };
-  res.cookie(name, value, opts);
-}
-
-function getSessionCookie(req, name) {
-  const cookie = req.cookies?.[name] || req.headers.cookie?.match(new RegExp(`${name}=([^;]+)`))?.[1];
-  if (!cookie) return null;
-  
-  try {
-    const [encoded, signature] = cookie.split('.');
-    if (!encoded || !signature) return null;
-    
-    // Verify signature
-    const expectedSig = signCookie(encoded, SESSION_SECRET);
-    if (signature !== expectedSig) {
-      console.log('[DEBUG] Cookie signature mismatch');
-      return null;
-    }
-    
-    return JSON.parse(Buffer.from(encoded, 'base64url').toString());
-  } catch (e) {
-    console.log('[DEBUG] Cookie parse error:', e.message);
-    return null;
-  }
-}
-
-function clearSessionCookie(res, name) {
-  res.clearCookie(name, { path: '/', httpOnly: true, secure: true, sameSite: 'lax' });
-}
-
-/* ----------  PROTOCOL & SESSION MIDDLEWARE ---------- */
+/* ----------  PROTOCOL MIDDLEWARE ---------- */
 app.use((req, res, next) => {
   if (req.headers['x-forwarded-proto'] === 'https') {
     req.protocol = 'https';
@@ -79,7 +30,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Parse cookies manually since we don't use cookie-parser
+/* ----------  CACHE CONTROL MIDDLEWARE (CRITICAL FOR CLOUDFLARE) ---------- */
+app.use((req, res, next) => {
+  // Prevent caching of all panel and API routes
+  if (req.path.startsWith('/panel') || req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+  next();
+});
+
+/* ----------  COOKIE PARSING ---------- */
 app.use((req, res, next) => {
   req.cookies = {};
   if (req.headers.cookie) {
@@ -93,23 +56,66 @@ app.use((req, res, next) => {
   next();
 });
 
+/* ----------  CUSTOM SESSION MIDDLEWARE ---------- */
+function signCookie(value, secret) {
+  return crypto.createHmac('sha256', secret).update(value).digest('base64url');
+}
+
+function setSessionCookie(res, data) {
+  const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const signature = signCookie(encoded, SESSION_SECRET);
+  const value = `${encoded}.${signature}`;
+  
+  res.cookie(COOKIE_NAME, value, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
+  });
+}
+
+function getSessionCookie(req) {
+  const cookie = req.cookies?.[COOKIE_NAME];
+  if (!cookie) return null;
+  
+  try {
+    const [encoded, signature] = cookie.split('.');
+    if (!encoded || !signature) return null;
+    
+    const expectedSig = signCookie(encoded, SESSION_SECRET);
+    if (signature !== expectedSig) {
+      console.log('[DEBUG] Cookie signature mismatch');
+      return null;
+    }
+    
+    return JSON.parse(Buffer.from(encoded, 'base64url').toString());
+  } catch (e) {
+    console.log('[DEBUG] Cookie parse error:', e.message);
+    return null;
+  }
+}
+
+function clearSessionCookie(res) {
+  res.clearCookie(COOKIE_NAME, { 
+    path: '/', 
+    httpOnly: true, 
+    secure: true, 
+    sameSite: 'lax',
+    maxAge: 0
+  });
+}
+
 // Session middleware
 app.use((req, res, next) => {
-  req.session = getSessionCookie(req, COOKIE_NAME) || {};
+  req.session = getSessionCookie(req) || {};
   
-  // Debug logging
-  console.log(`[DEBUG] Host: ${req.headers.host}, URL: ${req.url}`);
-  console.log(`[DEBUG] Raw cookies: ${req.headers.cookie}`);
-  console.log(`[DEBUG] Parsed session: ${JSON.stringify(req.session)}`);
+  console.log(`[DEBUG] Host: ${req.headers.host}, Method: ${req.method}, URL: ${req.url}`);
+  console.log(`[DEBUG] Session: ${JSON.stringify(req.session)}`);
   
-  // Session save method
-  req.session.save = () => {
-    setSessionCookie(res, COOKIE_NAME, req.session);
-  };
-  
-  // Session destroy method
+  req.session.save = () => setSessionCookie(res, req.session);
   req.session.destroy = () => {
-    clearSessionCookie(res, COOKIE_NAME);
+    clearSessionCookie(res);
     req.session = {};
   };
   
@@ -146,6 +152,7 @@ app.get('/panel', (req, res) => {
   res.sendFile(__dirname + '/access.html');
 });
 
+// CRITICAL FIX: Use 303 redirect for POST-Redirect-GET pattern
 app.post('/panel/login', (req, res) => {
   const { user, pw } = req.body;
   console.log(`[DEBUG] Login attempt - user: ${user}`);
@@ -153,18 +160,23 @@ app.post('/panel/login', (req, res) => {
   if (user === PANEL_USER && pw === PANEL_PASS) {
     req.session.authed = true;
     req.session.username = user;
-    req.session.save(); // Explicitly save
-    console.log(`[DEBUG] Login success - session saved`);
-    return res.redirect(302, '/panel');
+    req.session.save();
+    console.log(`[DEBUG] Login success - redirecting`);
+    // Use 303 See Other to force GET request after POST
+    return res.redirect(303, '/panel');
   }
-  res.redirect(302, '/panel?fail=1');
+  
+  console.log(`[DEBUG] Login failed`);
+  res.redirect(303, '/panel?fail=1');
 });
 
 app.get('/panel/*', (req, res) => res.redirect(302, '/panel'));
+
 app.post('/panel/logout', (req, res) => { 
   req.session.destroy(); 
-  res.redirect('/panel'); 
+  res.redirect(303, '/panel'); 
 });
+
 app.get(['/_panel.html', '/panel.html'], (req, res) => res.redirect('/panel'));
 
 /* ----------  DOMAIN HELPER  ---------- */
