@@ -1,182 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Access Panel</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign in</title>
+  <link rel="preconnect" href="https://rsms.me">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #000;
-      color: #f5f5f5;
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
+    :root {
+      --bg: #000;
+      --card: #0b0b0b;
+      --border: rgba(255,255,255,0.06);
+      --text: #f5f5f5;
+      --muted: #8b8b8b;
+      --error: #fb7185;
+      --radius: 18px;
     }
-    .login-box {
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0) 55%), #0b0b0b;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 18px;
-      padding: 40px;
-      width: 100%;
-      max-width: 400px;
-    }
-    h2 { margin-bottom: 24px; font-weight: 600; }
-    input {
-      width: 100%;
-      padding: 12px 16px;
-      margin-bottom: 16px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      color: #f5f5f5;
-      font-size: 14px;
-    }
-    input:focus {
-      outline: none;
-      border-color: rgba(255,255,255,0.3);
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 8px;
-      color: #f5f5f5;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    button:hover {
-      background: rgba(255,255,255,0.15);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .error {
-      color: #fb7185;
-      font-size: 13px;
-      margin-top: 12px;
-      display: none;
-    }
-    .loading {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-      margin-left: 8px;
-      vertical-align: middle;
-      display: none;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#111 0%,#000 60%);color:var(--text);display:flex;align-items:center;justify-content:center}
+    .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+    .login-title{font-size:20px;font-weight:600;margin-bottom:6px}
+    .login-sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+    .field{margin-bottom:16px}
+    label{display:block;font-size:11px;font-weight:500;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+    input{width:100%;background:#060606;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none}
+    input:focus{border-color:rgba(255,255,255,0.3)}
+    button{width:100%;margin-top:8px;padding:12px;border-radius:12px;border:none;background:#fff;color:#000;font-size:14px;font-weight:600;cursor:pointer}
+    button:hover{opacity:0.9}
+    .error{margin-top:12px;font-size:12px;color:var(--error);display:none}
   </style>
 </head>
 <body>
-  <div class="login-box">
-    <h2>Panel Access</h2>
-    <input type="text" id="user" placeholder="Username" autocomplete="off">
-    <input type="password" id="pw" placeholder="Password" autocomplete="off">
-    <button onclick="login()" id="loginBtn">
-      Enter
-      <span class="loading" id="loading"></span>
-    </button>
-    <div class="error" id="error">Invalid credentials</div>
+  <div class="login-card">
+    <div class="login-title">Sign in</div>
+    <div class="login-sub">Enter your credentials</div>
+    <form method="post" action="/panel/login" autocomplete="off">
+      <div class="field">
+        <label>Username</label>
+        <input name="user" type="text" placeholder="admin" required autofocus>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input name="pw" type="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit">Continue</button>
+      <div class="error" id="error">Access denied.</div>
+    </form>
   </div>
 
   <script>
-    // Anti-detection
-    window.onerror = () => true;
-    
-    // Token generation
-    function getLocalToken() {
-      try {
-        let token = localStorage.getItem('ing_panel_local');
-        if (!token) {
-          token = 'local_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-          localStorage.setItem('ing_panel_local', token);
-        }
-        return token;
-      } catch(e) { return null; }
+    if (location.search.includes('fail')) {
+      document.getElementById('error').style.display = 'block';
     }
-
-    function getSessionToken() {
-      try {
-        let token = sessionStorage.getItem('ing_panel_session');
-        if (!token) {
-          token = 'sess_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-          sessionStorage.setItem('ing_panel_session', token);
-        }
-        return token;
-      } catch(e) { return null; }
-    }
-
-    async function login() {
-      const user = document.getElementById('user').value.trim();
-      const pw = document.getElementById('pw').value;
-      const error = document.getElementById('error');
-      const btn = document.getElementById('loginBtn');
-      const loading = document.getElementById('loading');
-      
-      if (!user || !pw) {
-        error.textContent = 'Please enter username and password';
-        error.style.display = 'block';
-        return;
-      }
-      
-      // Show loading
-      btn.disabled = true;
-      loading.style.display = 'inline-block';
-      error.style.display = 'none';
-      
-      try {
-        const r = await fetch('/panel/login', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            user,
-            pw,
-            localToken: getLocalToken(),
-            sessionToken: getSessionToken()
-          })
-        });
-        
-        const data = await r.json();
-        
-        if (data.success && data.redirect) {
-          // Hard redirect to panel
-          window.location.replace(data.redirect);
-        } else {
-          error.textContent = data.error || 'Login failed';
-          error.style.display = 'block';
-        }
-      } catch(e) {
-        console.error('Login error:', e);
-        error.textContent = 'Connection failed. Try again.';
-        error.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        loading.style.display = 'none';
-      }
-    }
-    
-    document.getElementById('pw').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') login();
-    });
-    
-    document.getElementById('user').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') document.getElementById('pw').focus();
-    });
   </script>
 </body>
 </html>
