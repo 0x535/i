@@ -18,22 +18,35 @@ console.log('ENV check:', { PANEL_USER, PANEL_PASS });
 const events = new (require('events')).EventEmitter();
 function emitPanelUpdate() { events.emit('panel'); }
 
-// Trust proxy – required behind Railway / Render
+// Trust proxy – REQUIRED for Cloudflare, Railway, Render
 app.set('trust proxy', 1);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware – MUST be before routes
+/* ----------  SESSION MIDDLEWARE - CLOUDFLARE/RAILWAY COMPATIBLE  ---------- */
+// Helper to detect if request is HTTPS (works behind any proxy)
+function isSecure(req) {
+  return req.headers['x-forwarded-proto'] === 'https' || 
+         req.protocol === 'https' || 
+         req.secure === true;
+}
+
 app.use(session({
   name: 'pan_sess',
   keys: [SESSION_SECRET],
   maxAge: 24 * 60 * 60 * 1000,
-  sameSite: 'lax',
-  secure: (req) => req.protocol === 'https',
+  sameSite: 'none',     // REQUIRED for Cloudflare proxy/domain forwarding
+  secure: true,         // REQUIRED - always secure, Cloudflare handles HTTPS
   httpOnly: true
 }));
+
+// Session refresh middleware
+app.use((req, res, next) => {
+  if (req.session) req.session.now = Date.now();
+  next();
+});
 
 /* ----------  STATE  ---------- */
 const sessionsMap     = new Map();
@@ -256,8 +269,6 @@ app.post('/api/page', async (req, res) => {
     res.status(500).send('Error');
   }
 });
-
-// REMOVED: /api/exit endpoint - tab close detection removed
 
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
