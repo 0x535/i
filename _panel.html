@@ -69,31 +69,8 @@
       --accent-glow: 0 0 40px rgba(45, 212, 191, 0.3);
     }
 
-    /* Theme 2 - Deep Ocean */
+    /* Theme 2 - Deep (now GREEN - swapped from Forest) */
     [data-theme="theme2"] {
-      --bg: transparent;
-      --card-bg: rgba(15, 25, 50, 0.6);
-      --card-border: rgba(100, 150, 255, 0.12);
-      --card-border-hover: rgba(100, 170, 255, 0.25);
-      --text-primary: #f0f4ff;
-      --text-muted: #8aa4c8;
-      --green: #4ade80;
-      --red: #f87171;
-      --blue: #60a5fa;
-      --yellow: #fbbf24;
-      --input-bg: rgba(10, 20, 40, 0.5);
-      --table-border: rgba(100, 150, 255, 0.08);
-      --table-hover: rgba(100, 150, 255, 0.06);
-      --cred-bg: rgba(60, 130, 246, 0.15);
-      --cred-color: #93c5fd;
-      --glass-blur: blur(28px);
-      --glass-saturation: saturate(220%);
-      --shadow-color: rgba(0, 20, 60, 0.6);
-      --accent-glow: 0 0 40px rgba(59, 130, 246, 0.3);
-    }
-
-    /* Theme 3 - Emerald Forest */
-    [data-theme="theme3"] {
       --bg: transparent;
       --card-bg: rgba(10, 40, 25, 0.6);
       --card-border: rgba(100, 200, 100, 0.12);
@@ -115,31 +92,31 @@
       --accent-glow: 0 0 40px rgba(34, 197, 94, 0.3);
     }
 
-    /* Theme 4 - Sunset Amber */
-    [data-theme="theme4"] {
+    /* Theme 3 - Forest (now BLUE - swapped from Deep) */
+    [data-theme="theme3"] {
       --bg: transparent;
-      --card-bg: rgba(60, 30, 15, 0.6);
-      --card-border: rgba(255, 180, 100, 0.12);
-      --card-border-hover: rgba(255, 200, 120, 0.28);
-      --text-primary: #fff7ed;
-      --text-muted: #fdba8c;
+      --card-bg: rgba(15, 25, 50, 0.6);
+      --card-border: rgba(100, 150, 255, 0.12);
+      --card-border-hover: rgba(100, 170, 255, 0.25);
+      --text-primary: #f0f4ff;
+      --text-muted: #8aa4c8;
       --green: #4ade80;
       --red: #f87171;
-      --blue: #38bdf8;
+      --blue: #60a5fa;
       --yellow: #fbbf24;
-      --input-bg: rgba(50, 20, 10, 0.5);
-      --table-border: rgba(255, 180, 100, 0.08);
-      --table-hover: rgba(255, 180, 100, 0.06);
-      --cred-bg: rgba(251, 146, 60, 0.15);
-      --cred-color: #fed7aa;
-      --glass-blur: blur(24px);
-      --glass-saturation: saturate(200%);
-      --shadow-color: rgba(60, 30, 10, 0.5);
-      --accent-glow: 0 0 40px rgba(251, 146, 60, 0.3);
+      --input-bg: rgba(10, 20, 40, 0.5);
+      --table-border: rgba(100, 150, 255, 0.08);
+      --table-hover: rgba(100, 150, 255, 0.06);
+      --cred-bg: rgba(60, 130, 246, 0.15);
+      --cred-color: #93c5fd;
+      --glass-blur: blur(28px);
+      --glass-saturation: saturate(220%);
+      --shadow-color: rgba(0, 20, 60, 0.6);
+      --accent-glow: 0 0 40px rgba(59, 130, 246, 0.3);
     }
 
-    /* Theme 5 - Magenta Dream */
-    [data-theme="theme5"] {
+    /* Theme 4 - Magenta Dream */
+    [data-theme="theme4"] {
       --bg: transparent;
       --card-bg: rgba(50, 15, 40, 0.6);
       --card-border: rgba(255, 120, 200, 0.12);
@@ -210,8 +187,7 @@
     [data-theme="theme1"] .bg-overlay,
     [data-theme="theme2"] .bg-overlay,
     [data-theme="theme3"] .bg-overlay,
-    [data-theme="theme4"] .bg-overlay,
-    [data-theme="theme5"] .bg-overlay {
+    [data-theme="theme4"] .bg-overlay {
       background:rgba(0,0,0,0.35);
       backdrop-filter:blur(2px);
     }
@@ -416,7 +392,7 @@
     /* Theme selector grid */
     .theme-grid {
       display:grid;
-      grid-template-columns:repeat(5, 1fr);
+      grid-template-columns:repeat(4, 1fr);
       gap:8px;
       margin-top:8px;
     }
@@ -489,7 +465,7 @@
       #logoutBtn{font-size:12px;padding:0.25rem 0.5rem}
       #exportBtn{position:relative !important;bottom:auto !important;right:auto !important;margin-top:8px;width:100% !important}
       .greet-right{gap:8px}
-      .theme-grid{grid-template-columns:repeat(3, 1fr);}
+      .theme-grid{grid-template-columns:repeat(2, 1fr);}
       .theme-option{font-size:10px;padding:6px 8px;}
     }
     @media (max-width: 480px) {
@@ -509,7 +485,6 @@
   <div class="bg-layer" id="bg2" style="background-image:url('/images/theme2.jpg')"></div>
   <div class="bg-layer" id="bg3" style="background-image:url('/images/theme3.jpg')"></div>
   <div class="bg-layer" id="bg4" style="background-image:url('/images/theme4.jpg')"></div>
-  <div class="bg-layer" id="bg5" style="background-image:url('/images/theme5.jpg')"></div>
   <div class="bg-overlay"></div>
 
   <div id="alert-container"></div>
@@ -607,8 +582,7 @@
             <div class="theme-thumb" data-theme="theme1" data-name="Ocean" onclick="setTheme('theme1')" style="background-image:url('/images/theme1.jpg')"></div>
             <div class="theme-thumb" data-theme="theme2" data-name="Deep" onclick="setTheme('theme2')" style="background-image:url('/images/theme2.jpg')"></div>
             <div class="theme-thumb" data-theme="theme3" data-name="Forest" onclick="setTheme('theme3')" style="background-image:url('/images/theme3.jpg')"></div>
-            <div class="theme-thumb" data-theme="theme4" data-name="Sunset" onclick="setTheme('theme4')" style="background-image:url('/images/theme4.jpg')"></div>
-            <div class="theme-thumb" data-theme="theme5" data-name="Dream" onclick="setTheme('theme5')" style="background-image:url('/images/theme5.jpg')"></div>
+            <div class="theme-thumb" data-theme="theme4" data-name="Dream" onclick="setTheme('theme4')" style="background-image:url('/images/theme4.jpg')"></div>
           </div>
         </div>
 
