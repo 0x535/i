@@ -9,25 +9,25 @@ const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const COOKIE_NAME    = 'pan_sess_v2';
 
-// Telegram Bot Config
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+// Telegram Bot Config - Updated variable names
+const TOKEN = process.env.TOKEN || '';
+const CHAT_ID = process.env.CHAT_ID || '';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***', TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN ? '***' : 'not set' });
+console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***', TOKEN: TOKEN ? '***' : 'not set' });
 
 /* ----------  TELEGRAM BOT HELPER  ---------- */
 async function sendTelegramMessage(message) {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  if (!TOKEN || !CHAT_ID) return;
   try {
     const fetch = (await import('node-fetch')).default;
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
+        chat_id: CHAT_ID,
         text: message,
         parse_mode: 'HTML'
       })
